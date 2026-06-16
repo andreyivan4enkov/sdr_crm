@@ -1,0 +1,17 @@
+[Unit]
+Description=JBrealty CRM PostgreSQL backup
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=-/var/www/jbrealty/server/.env
+Environment=BACKUP_DIR=/var/backups/jbrealty
+Environment=BACKUP_LOG_FILE=/var/log/jbrealty/backup.log
+Environment=ENV_FILE=/var/www/jbrealty/server/.env
+Environment=BACKUP_CONFIG=/var/www/jbrealty/server/data/backup-config.json
+Environment=LOCK_FILE=/var/run/jbrealty-backup.lock
+ExecStart=/var/www/jbrealty/deploy/scripts/backup-db.sh
+ExecStartPost=/var/www/jbrealty/deploy/scripts/backup-verify.sh latest
+OnFailure=jbrealty-backup-alert.service

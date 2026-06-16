@@ -1,0 +1,35 @@
+# Замените YOUR_DOMAIN на ваш домен перед копированием в /etc/caddy/Caddyfile
+# Пример: crm.jbrealty.ru
+
+(security_headers) {
+    header {
+        X-Robots-Tag "noindex, nofollow, noarchive, nosnippet"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        -Server
+    }
+}
+
+YOUR_DOMAIN {
+    import security_headers
+    root * /var/www/jbrealty/dist
+    encode gzip zstd
+
+    handle /api/events/stream {
+        reverse_proxy localhost:3000 {
+            flush_interval -1
+        }
+    }
+
+    handle /api/* {
+        reverse_proxy localhost:3000
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}

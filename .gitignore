@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+*.local
+
+# Backups (local)
+backups/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Vite
+.vite/
+
+# Local embedded DB
+server/data/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+.cursor/
+
+# Telephony secrets (local only)
+cloudpbx.beeline.ru.md
+
+# Test / coverage
+coverage/

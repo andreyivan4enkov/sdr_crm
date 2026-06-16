@@ -1,0 +1,22 @@
+name: Сообщение об ошибке
+description: Опишите проблему в JBrealty CRM
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за отчёт. Укажите шаги воспроизведения и ожидаемое поведение.
+  - type: textarea
+    id: description
+    attributes:
+      label: Что произошло?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+    validations:
+      required: true

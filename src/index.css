@@ -1,0 +1,935 @@
+@import "tailwindcss";
+
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
+
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-jbr-accent: #ff8b6a;
+  --color-jbr-accent-hover: #f07858;
+  --color-jbr-accent-light: #fff0eb;
+  --color-jbr-dark: #303030;
+}
+
+@source inline("bg-sky-500 bg-cyan-500 bg-teal-500 bg-emerald-500 bg-amber-500 bg-orange-500 bg-violet-500 bg-indigo-500 bg-rose-500 bg-slate-500");
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+  max-width: 100%;
+  overscroll-behavior-x: none;
+}
+
+html {
+  overflow-x: hidden;
+  max-width: 100%;
+  overscroll-behavior-x: none;
+}
+
+:root {
+  --crm-header-h: 3rem;
+  --crm-mobile-nav-h: 3.5rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --crm-header-h: 0px;
+    --crm-mobile-nav-h: 0px;
+  }
+}
+
+/* Интерфейс CRM не копируется; выделяется только пользовательский/системный контент */
+[data-crm-app] {
+  -webkit-user-select: none;
+  user-select: none;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.crm-app-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  padding-top: var(--crm-header-h);
+}
+
+@media (min-width: 768px) {
+  .crm-app-shell {
+    padding-top: 0;
+  }
+}
+
+[data-crm-app] input,
+[data-crm-app] textarea,
+[data-crm-app] select,
+[data-crm-app] [contenteditable="true"],
+[data-crm-app] .crm-data {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+[data-crm-app] button,
+[data-crm-app] nav,
+[data-crm-app] th,
+[data-crm-app] label,
+[data-crm-app] .crm-chrome {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Корпоративный акцент JB Realty (jbrealty.ru): коралловый #ff8b6a поверх teal-классов */
+[data-brand="true"] .text-teal-200,
+[data-brand="true"] .text-teal-300,
+[data-brand="true"] .text-teal-400,
+[data-brand="true"] .text-teal-500,
+[data-brand="true"] .text-teal-600,
+[data-brand="true"] .text-teal-700,
+[data-brand="true"] .dark\:text-teal-200,
+[data-brand="true"] .dark\:text-teal-300,
+[data-brand="true"] .dark\:text-teal-400 {
+  color: var(--color-jbr-accent) !important;
+}
+
+[data-brand="true"] .bg-teal-500,
+[data-brand="true"] .bg-teal-600 {
+  background-color: var(--color-jbr-accent) !important;
+}
+
+[data-brand="true"] .hover\:bg-teal-700:hover {
+  background-color: var(--color-jbr-accent-hover) !important;
+}
+
+[data-brand="true"] .bg-teal-50,
+[data-brand="true"] .bg-teal-100 {
+  background-color: var(--color-jbr-accent-light) !important;
+}
+
+[data-brand="true"] [class*="bg-teal-500/"] {
+  background-color: rgb(255 139 106 / 0.15) !important;
+}
+
+[data-brand="true"] .text-teal-700.dark\:text-teal-300,
+[data-brand="true"] .bg-teal-100.text-teal-700,
+[data-brand="true"] .dark\:bg-teal-500\/20.dark\:text-teal-300 {
+  color: #c45a3a !important;
+}
+
+[data-brand="true"] .border-teal-300,
+[data-brand="true"] .border-teal-400,
+[data-brand="true"] .border-teal-500 {
+  border-color: var(--color-jbr-accent) !important;
+}
+
+[data-brand="true"] .hover\:border-teal-400:hover,
+[data-brand="true"] .hover\:text-teal-500:hover {
+  border-color: var(--color-jbr-accent) !important;
+  color: var(--color-jbr-accent) !important;
+}
+
+[data-brand="true"] .ring-teal-400,
+[data-brand="true"] .ring-teal-500,
+[data-brand="true"] .focus\:ring-teal-500\/30:focus {
+  --tw-ring-color: rgb(255 139 106 / 0.35) !important;
+}
+
+[data-brand="true"] .focus\:border-teal-500:focus {
+  border-color: var(--color-jbr-accent) !important;
+}
+
+[data-brand="true"] .from-teal-500 {
+  --tw-gradient-from: var(--color-jbr-accent) !important;
+  --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+}
+
+[data-brand="true"] .to-emerald-500 {
+  --tw-gradient-to: #f5a88a !important;
+}
+
+[data-brand="true"] .border-l-teal-300,
+[data-brand="true"] .border-l-2.border-teal-300 {
+  border-left-color: var(--color-jbr-accent-muted, #ffb89e) !important;
+}
+
+[data-brand="true"] .accent-teal-600 {
+  accent-color: var(--color-jbr-accent) !important;
+}
+
+/* Биоморфные поверхности — стекло + мягкие тени */
+.bio-card,
+.bio-glass-panel {
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    0 2px 8px -3px rgba(15, 23, 42, 0.08),
+    0 12px 28px -14px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+[data-color-mode="dark"] .bio-card,
+[data-color-mode="dark"] .bio-glass-panel {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.82) 0%, rgba(15, 23, 42, 0.55) 100%);
+  box-shadow:
+    0 4px 20px -8px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.bio-glass-tabs {
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.06) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 0.25rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+[data-color-mode="dark"] .bio-glass-tabs {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.65) 0%, rgba(15, 23, 42, 0.38) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.bio-glass-input {
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.08) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+[data-color-mode="dark"] .bio-glass-input {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.55) 0%, rgba(15, 23, 42, 0.35) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Стеклянные капсулы даты/времени — тонкий биоморфизм */
+.glass-drum-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+}
+
+.glass-drum-row--datetime {
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+.glass-drum--elegant .glass-drum-capsule {
+  position: relative;
+  width: 2.35rem;
+  height: 1.875rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, 0.72) 0%,
+    rgba(255, 255, 255, 0.18) 48%,
+    rgba(226, 232, 240, 0.12) 100%
+  );
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.glass-drum--elegant .glass-drum-capsule--wide {
+  width: 2.85rem;
+}
+
+[data-color-mode="dark"] .glass-drum--elegant .glass-drum-capsule {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: linear-gradient(
+    168deg,
+    rgba(51, 65, 85, 0.65) 0%,
+    rgba(30, 41, 59, 0.42) 55%,
+    rgba(15, 23, 42, 0.35) 100%
+  );
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.glass-drum-lens {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, transparent 42%);
+  z-index: 3;
+}
+
+.glass-drum-slot {
+  pointer-events: none;
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 1.875rem;
+  transform: translateY(-50%);
+  border-radius: 0.4rem;
+  border: 1px solid rgba(13, 148, 136, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  z-index: 1;
+}
+
+[data-color-mode="dark"] .glass-drum-slot {
+  border-color: rgba(45, 212, 191, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.glass-drum-scroll {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+}
+
+.glass-drum-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.glass-drum-item {
+  height: 1.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: inherit;
+  opacity: 0.22;
+  transition: opacity 0.12s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.glass-drum-item--active {
+  opacity: 1;
+  font-weight: 650;
+  color: var(--color-slate-800, #1e293b);
+  text-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.8);
+}
+
+[data-color-mode="dark"] .glass-drum-item--active {
+  color: #f1f5f9;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.glass-drum-sep {
+  font-weight: 500;
+  font-size: 0.75rem;
+  opacity: 0.35;
+  user-select: none;
+  line-height: 1;
+}
+
+.glass-drum-sep--gap {
+  width: 0.35rem;
+}
+
+.glass-drum-colon {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.5;
+}
+
+.glass-drum-capsule--editable {
+  cursor: pointer;
+}
+
+.glass-drum-capsule--editable:active .glass-drum-item--active {
+  opacity: 0.85;
+}
+
+/* Попап ручного ввода + календарь */
+.glass-drum-popover-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+.glass-drum-popover-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+.glass-drum-popover {
+  position: fixed;
+  z-index: 121;
+  width: min(17.5rem, calc(100vw - 1rem));
+  padding: 0.75rem;
+  border-radius: 1rem;
+  touch-action: manipulation;
+  overscroll-behavior: contain;
+}
+
+.glass-drum-popover.bio-glass-panel {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.18) 55%, rgba(255, 255, 255, 0.1) 100%);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  box-shadow:
+    0 8px 28px -10px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+[data-color-mode="dark"] .glass-drum-popover.bio-glass-panel {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: linear-gradient(155deg, rgba(51, 65, 85, 0.68) 0%, rgba(30, 41, 59, 0.48) 55%, rgba(15, 23, 42, 0.38) 100%);
+  box-shadow:
+    0 12px 36px -12px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.glass-drum-popover--mobile {
+  position: relative;
+  top: auto !important;
+  left: auto !important;
+  width: 100%;
+  max-width: 100%;
+  flex-shrink: 0;
+  transform: none;
+}
+
+.glass-drum-popover-head {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin-bottom: 0.5rem;
+}
+
+.glass-drum-popover-input-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.glass-drum-popover-input {
+  flex: 1;
+  min-width: 0;
+  height: 2rem;
+  padding: 0 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-slate-800, #1e293b);
+  outline: none;
+}
+
+[data-color-mode="dark"] .glass-drum-popover-input {
+  color: #f1f5f9;
+}
+
+.glass-drum-popover-input:focus {
+  border-color: rgba(45, 212, 191, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 0 2px rgba(45, 212, 191, 0.15);
+}
+
+.glass-drum-popover-apply {
+  flex-shrink: 0;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.75) 0%, rgba(204, 251, 241, 0.2) 100%);
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: #0f766e;
+  cursor: pointer;
+}
+
+[data-color-mode="dark"] .glass-drum-popover-apply {
+  color: #5eead4;
+  border-color: rgba(45, 212, 191, 0.28);
+  background: linear-gradient(145deg, rgba(30, 58, 66, 0.7) 0%, rgba(15, 23, 42, 0.45) 100%);
+}
+
+.glass-drum-popover-hint {
+  font-size: 0.6875rem;
+  opacity: 0.5;
+  margin-bottom: 0.5rem;
+}
+
+/* Стеклянный календарь — матовое стекло, не плотная заливка */
+.glass-calendar {
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.14) 100%);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+[data-color-mode="dark"] .glass-calendar {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: linear-gradient(160deg, rgba(51, 65, 85, 0.52) 0%, rgba(30, 41, 59, 0.28) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.glass-calendar-title {
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-align: center;
+  flex: 1;
+  color: var(--color-slate-800, #1e293b);
+}
+
+[data-color-mode="dark"] .glass-calendar-title {
+  color: #f1f5f9;
+}
+
+.glass-calendar-nav {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.48) 0%, rgba(255, 255, 255, 0.12) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-slate-600, #475569);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+[data-color-mode="dark"] .glass-calendar-nav {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: linear-gradient(145deg, rgba(51, 65, 85, 0.5) 0%, rgba(30, 41, 59, 0.28) 100%);
+  color: #cbd5e1;
+}
+
+.glass-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.125rem;
+  margin-bottom: 0.25rem;
+}
+
+.glass-calendar-weekday {
+  text-align: center;
+  font-size: 0.625rem;
+  font-weight: 600;
+  opacity: 0.45;
+  text-transform: lowercase;
+}
+
+.glass-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.125rem;
+}
+
+.glass-calendar-day {
+  aspect-ratio: 1;
+  min-height: 1.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-slate-700, #334155);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+[data-color-mode="dark"] .glass-calendar-day {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.glass-calendar-day--empty {
+  pointer-events: none;
+}
+
+.glass-calendar-day:hover:not(.glass-calendar-day--picked) {
+  background: rgba(255, 255, 255, 0.38);
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+[data-color-mode="dark"] .glass-calendar-day:hover:not(.glass-calendar-day--picked) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.glass-calendar-day--today {
+  border-color: rgba(45, 212, 191, 0.35);
+}
+
+.glass-calendar-day--picked {
+  border-color: rgba(45, 212, 191, 0.5);
+  background: linear-gradient(145deg, rgba(204, 251, 241, 0.55) 0%, rgba(45, 212, 191, 0.22) 100%);
+  color: #0f766e;
+  font-weight: 700;
+}
+
+[data-color-mode="dark"] .glass-calendar-day--picked {
+  background: linear-gradient(145deg, rgba(45, 212, 191, 0.28) 0%, rgba(15, 118, 110, 0.35) 100%);
+  color: #99f6e4;
+}
+
+.bio-divide {
+  border-top: none !important;
+  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.22), transparent);
+  height: 1px;
+}
+
+.bio-glass-add {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.78) 0%, rgba(204, 251, 241, 0.22) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 2px 12px -4px rgba(13, 148, 136, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-color-mode="dark"] .bio-glass-add {
+  border-color: rgba(45, 212, 191, 0.3);
+  background: linear-gradient(145deg, rgba(30, 58, 66, 0.75) 0%, rgba(15, 23, 42, 0.5) 100%);
+  box-shadow:
+    0 4px 18px -6px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Стеклянная панель — компактные тулбары */
+.bio-glass-bar {
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.08) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    0 2px 14px -6px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+[data-color-mode="dark"] .bio-glass-bar {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.72) 0%, rgba(15, 23, 42, 0.42) 100%);
+  box-shadow:
+    0 4px 22px -8px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.bio-glass-chip {
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+[data-color-mode="dark"] .bio-glass-chip {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(30, 41, 59, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* —— Glass call history & audio player —— */
+.glass-call-card {
+  padding: 0.75rem 0.875rem;
+  border-radius: 1rem;
+}
+
+.glass-call-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.75rem;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.glass-call-icon--in {
+  color: rgb(13, 148, 136);
+  background: rgba(20, 184, 166, 0.12);
+}
+
+.glass-call-icon--out {
+  color: rgb(59, 130, 246);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+[data-color-mode="dark"] .glass-call-icon {
+  border-color: rgba(148, 163, 184, 0.15);
+  background: rgba(30, 41, 59, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-call-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.45rem;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.15);
+  color: rgb(100, 116, 139);
+  white-space: nowrap;
+}
+
+.glass-call-badge--live {
+  background: rgba(16, 185, 129, 0.15);
+  color: rgb(5, 150, 105);
+  animation: glass-call-pulse 2s ease-in-out infinite;
+}
+
+@keyframes glass-call-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+.glass-call-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  margin-bottom: 0.35rem;
+}
+
+.glass-call-transcript,
+.glass-call-ai {
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+[data-color-mode="dark"] .glass-call-transcript,
+[data-color-mode="dark"] .glass-call-ai {
+  border-color: rgba(148, 163, 184, 0.1);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.glass-call-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.15s, transform 0.1s;
+}
+
+.glass-call-action:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.glass-call-action--primary {
+  color: rgb(13, 148, 136);
+  border-color: rgba(20, 184, 166, 0.25);
+  background: rgba(20, 184, 166, 0.1);
+}
+
+.glass-call-dial-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.75rem;
+  color: white;
+  background: linear-gradient(135deg, rgb(13, 148, 136), rgb(20, 184, 166));
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.glass-call-dial-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.glass-call-dial-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.glass-call-player {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+[data-color-mode="dark"] .glass-call-player {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(30, 41, 59, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-call-player-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  color: white;
+  background: linear-gradient(135deg, rgb(13, 148, 136), rgb(45, 212, 191));
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+}
+
+.glass-call-player-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.15rem;
+}
+
+.glass-call-player-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    rgb(20, 184, 166) 0%,
+    rgb(20, 184, 166) var(--pct, 0%),
+    rgba(148, 163, 184, 0.25) var(--pct, 0%),
+    rgba(148, 163, 184, 0.25) 100%
+  );
+  cursor: pointer;
+}
+
+.glass-call-player-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: white;
+  border: 2px solid rgb(20, 184, 166);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .glass-drum-row--datetime {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 0.25rem;
+  }
+
+  .glass-drum--elegant .glass-drum-capsule {
+    width: 2.1rem;
+    height: 1.75rem;
+  }
+
+  .glass-drum--elegant .glass-drum-capsule--wide {
+    width: 2.55rem;
+  }
+
+  .glass-drum-item {
+    height: 1.75rem;
+    font-size: 0.75rem;
+  }
+
+  .glass-drum-popover-layer {
+    padding: 0.75rem;
+  }
+
+  .glass-drum-popover--mobile {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .glass-calendar-day {
+    min-height: 2.25rem;
+    font-size: 0.8125rem;
+  }
+}

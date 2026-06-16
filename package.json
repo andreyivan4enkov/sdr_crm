@@ -1,0 +1,66 @@
+{
+  "name": "jbrealty-crm",
+  "version": "1.0.0",
+  "description": "Персональная CRM для риэлторского агентства JBrealty",
+  "type": "module",
+  "license": "MIT",
+  "author": "Corpuscul",
+  "repository": {
+    "type": "git",
+    "url": "https://gitverse.ru/Corpuscul/JBrealty-CRM.git"
+  },
+  "homepage": "https://gitverse.ru/Corpuscul/JBrealty-CRM",
+  "bugs": {
+    "url": "https://gitverse.ru/Corpuscul/JBrealty-CRM/issues"
+  },
+  "keywords": [
+    "crm",
+    "realty",
+    "react",
+    "vite",
+    "tailwindcss"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "server",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "npm run dev -w @jbrealty/server",
+    "dev:all": "bash scripts/dev-all.sh",
+    "build": "vite build",
+    "build:api": "npm run build -w @jbrealty/server",
+    "build:all": "npm run build:api && npm run build",
+    "preview": "vite preview",
+    "db:up": "docker compose up -d",
+    "db:migrate": "npm run db:migrate -w @jbrealty/server",
+    "db:seed": "npm run db:seed -w @jbrealty/server",
+    "db:setup": "npm run db:up && sleep 2 && npm run db:migrate && npm run db:seed",
+    "db:reset": "rm -rf server/data/jbrealty && npm run db:migrate && npm run db:seed",
+    "db:backup": "bash deploy/scripts/backup-pglite.sh",
+    "db:backup:prod": "bash deploy/scripts/backup-db.sh",
+    "db:restore": "bash deploy/scripts/restore-db.sh",
+    "ops:install": "bash deploy/scripts/install-ops.sh",
+    "job:retention": "npm run job:retention -w @jbrealty/server",
+    "extension:load": "echo 'Chrome → Расширения → Режим разработчика → Загрузить распакованное → extension/'"
+  },
+  "dependencies": {
+    "@jbrealty/api-client": "workspace:*",
+    "lucide-react": "^0.511.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.8",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.0",
+    "tailwindcss": "^4.1.8",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5"
+  }
+}

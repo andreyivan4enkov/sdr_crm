@@ -1,0 +1,10 @@
+ALTER TABLE fields ADD COLUMN IF NOT EXISTS grid_col integer NOT NULL DEFAULT 0;
+ALTER TABLE fields ADD COLUMN IF NOT EXISTS grid_row integer NOT NULL DEFAULT 0;
+ALTER TABLE fields ADD COLUMN IF NOT EXISTS grid_span integer NOT NULL DEFAULT 2;
+
+CREATE TABLE IF NOT EXISTS crm_meta (
+  key text PRIMARY KEY,
+  value jsonb NOT NULL DEFAULT '{}'
+);
+
+GRANT ALL ON TABLE crm_meta TO jbrealty;

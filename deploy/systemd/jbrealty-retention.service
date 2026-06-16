@@ -1,0 +1,10 @@
+[Unit]
+Description=JBrealty CRM PD retention purge
+After=postgresql.service jbrealty-api.service
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory=/var/www/jbrealty/server
+EnvironmentFile=/var/www/jbrealty/server/.env
+ExecStart=/usr/bin/node dist/jobs/retention-purge.js

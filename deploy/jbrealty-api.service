@@ -1,0 +1,28 @@
+[Unit]
+Description=JBrealty CRM API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/jbrealty/server
+EnvironmentFile=/var/www/jbrealty/server/.env
+Environment=LOG_LEVEL=info
+Environment=LOG_FILE=/var/log/jbrealty/api.log
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=jbrealty-api
+
+# Безопасность
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/jbrealty /var/www/jbrealty/server/data /var/backups/jbrealty
+
+[Install]
+WantedBy=multi-user.target

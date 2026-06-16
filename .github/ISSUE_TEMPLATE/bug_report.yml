@@ -1,0 +1,38 @@
+name: Сообщение об ошибке
+description: Опишите проблему в JBrealty CRM
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за отчёт. Укажите шаги воспроизведения и ожидаемое поведение.
+  - type: textarea
+    id: description
+    attributes:
+      label: Что произошло?
+      description: Кратко опишите баг
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      placeholder: |
+        1. Открыть CRM как operator
+        2. Перетащить лид на этап «Сделка»
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Браузер и ОС
+      placeholder: Chrome 125, Windows 11
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+    validations:
+      required: true
