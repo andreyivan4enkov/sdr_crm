@@ -28,6 +28,27 @@ YOUR_DOMAIN {
         reverse_proxy localhost:3000
     }
 
+    # Статика: без SPA-fallback (иначе 404 .js отдаёт index.html → белый экран)
+    handle /assets/* {
+        file_server
+    }
+
+    handle /icons/* {
+        file_server
+    }
+
+    handle /sw.js {
+        file_server
+    }
+
+    handle /manifest.webmanifest {
+        file_server
+    }
+
+    handle /favicon.ico {
+        file_server
+    }
+
     handle {
         try_files {path} /index.html
         file_server

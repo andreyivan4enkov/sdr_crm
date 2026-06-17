@@ -56,7 +56,7 @@ mkdir -p /var/www/jbrealty
 cd /var/www/jbrealty
 
 # Вариант A: git clone (если репозиторий публичный или настроен deploy key)
-git clone https://gitverse.ru/Corpuscul/JBrealty-CRM.git .
+git clone https://gitverse.ru/Corpuscul/sdr_crm.git .
 
 # Вариант B: загрузить с компьютера
 # scp -r ./JBrealty-CRM/* root@ВАШ_IP:/var/www/jbrealty/

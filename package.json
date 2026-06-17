@@ -7,11 +7,11 @@
   "author": "Corpuscul",
   "repository": {
     "type": "git",
-    "url": "https://gitverse.ru/Corpuscul/JBrealty-CRM.git"
+    "url": "https://gitverse.ru/Corpuscul/sdr_crm.git"
   },
-  "homepage": "https://gitverse.ru/Corpuscul/JBrealty-CRM",
+  "homepage": "https://gitverse.ru/Corpuscul/sdr_crm",
   "bugs": {
-    "url": "https://gitverse.ru/Corpuscul/JBrealty-CRM/issues"
+    "url": "https://gitverse.ru/Corpuscul/sdr_crm/issues"
   },
   "keywords": [
     "crm",

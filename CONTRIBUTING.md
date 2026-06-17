@@ -29,4 +29,4 @@
 
 ## Вопросы
 
-Обсуждение — через [Issues](https://gitverse.ru/Corpuscul/JBrealty-CRM/issues) репозитория.
+Обсуждение — через [Issues](https://gitverse.ru/Corpuscul/sdr_crm/issues) репозитория.

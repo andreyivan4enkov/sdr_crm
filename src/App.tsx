@@ -6,6 +6,7 @@ import { useCrmData, persistLeadUpdate, persistNewLead, persistStages, persistPi
 import { useLeadFieldDraft } from "./hooks/useLeadFieldDraft";
 import { formatPhoneInput, formatPhoneDisplay, isValidRuPhone, PHONE_FORMAT_HINT } from "./lib/phone";
 import { useCrmNavStack } from "./hooks/useCrmNavStack";
+import { useIsMobile } from "./hooks/useMediaQuery";
 import { useSwipeBack } from "./hooks/useSwipeBack";
 import { useSse } from "./hooks/useSse";
 import { useAutoRefresh } from "./hooks/useAutoRefresh";

@@ -13,8 +13,8 @@
 Требуется Node.js 20+.
 
 ```bash
-git clone https://gitverse.ru/Corpuscul/JBrealty-CRM.git
-cd JBrealty-CRM
+git clone https://gitverse.ru/Corpuscul/sdr_crm.git
+cd sdr_crm
 cp deploy/.env.example server/.env
 npm install
 npm run db:migrate && npm run db:seed
