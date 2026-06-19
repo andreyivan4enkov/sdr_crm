@@ -1,6 +1,6 @@
-# Подключение Tilda (jbrealty.ru) к JBrealty CRM
+# Подключение Tilda (example.com) к SDR CRM
 
-Сайт [jbrealty.ru](https://jbrealty.ru/) на Tilda. Форма заявки содержит поля **Имя**, **Телефон**, **Дата** — в webhook Tilda они приходят как `Name`, `Phone`, `Date` ([документация Tilda](https://help.tilda.cc/forms/webhook)).
+Сайт [example.com](https://example.com/) на Tilda. Форма заявки содержит поля **Имя**, **Телефон**, **Дата** — в webhook Tilda они приходят как `Name`, `Phone`, `Date` ([документация Tilda](https://help.tilda.cc/forms/webhook)).
 
 ## 1. Включите интеграцию в CRM
 
@@ -31,7 +31,7 @@ pd_consent=pdConsent
 
 ## 2. Согласие на обработку ПДн (152-ФЗ)
 
-В форме Tilda добавьте **чекбокс** согласия со ссылкой на политику (`https://crm.jbrealty.ru/privacy` или страница на jbrealty.ru).
+В форме Tilda добавьте **чекбокс** согласия со ссылкой на политику (`https://crm.example.com/privacy` или страница на example.com).
 
 В настройках поля чекбокса укажите **имя переменной**: `pd_consent`.
 
@@ -39,15 +39,15 @@ CRM принимает значения: `yes`, `1`, `true`, `on`, `да`.
 
 ## 3. Настройте webhook в Tilda
 
-1. [Tilda](https://tilda.cc) → ваш проект **jbrealty.ru**
+1. [Tilda](https://tilda.cc) → ваш проект **example.com**
 2. **Настройки сайта** → **Формы** → **Webhook**
 3. URL (Tilda не поддерживает произвольные заголовки — секрет в query):
 
 ```
-https://crm.jbrealty.ru/api/webhooks/tilda?secret=ВАШ_СЕКРЕТ_ИЗ_CRM
+https://crm.example.com/api/webhooks/tilda?secret=ВАШ_СЕКРЕТ_ИЗ_CRM
 ```
 
-Пока HTTPS на `crm.jbrealty.ru` не готов, временно:
+Пока HTTPS на `crm.example.com` не готов, временно:
 
 ```
 http://161.104.16.243/api/webhooks/tilda?secret=ВАШ_СЕКРЕТ_ИЗ_CRM

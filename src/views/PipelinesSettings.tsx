@@ -11,7 +11,7 @@ type LabeledProps = { label: string; t: Record<string, string>; children: React.
 type Props = {
   t: Record<string, string>;
   pipelines: Pipeline[];
-  updateData: (patch: { pipelines?: Pipeline[]; stages?: import("@jbrealty/api-client").Stage[] }) => void | Promise<void>;
+  updateData: (patch: { pipelines?: Pipeline[]; stages?: import("@sdr-crm/api-client").Stage[] }) => void | Promise<void>;
   reload?: () => void;
   Btn: React.FC<BtnProps>;
   TInput: React.FC<TInputProps>;

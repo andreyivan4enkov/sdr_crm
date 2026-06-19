@@ -1,5 +1,5 @@
 name: Сообщение об ошибке
-description: Опишите проблему в JBrealty CRM
+description: Опишите проблему в SDR CRM
 title: "[Bug]: "
 labels:
   - bug

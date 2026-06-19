@@ -38,6 +38,9 @@ if (isPglite && process.env.NODE_ENV !== "production") {
   await runMigrations();
 }
 
+const { initSdrLayer } = await import("./lib/sdr/index.js");
+await initSdrLayer();
+
 const app = new Hono<AppEnv>();
 
 app.use("*", secureHeaders({

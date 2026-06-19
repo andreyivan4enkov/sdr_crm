@@ -18,6 +18,7 @@ import {
 } from "../lib/totp.js";
 import { validateAvatarDataUrl } from "../lib/avatar.js";
 import { toApiUser } from "../lib/user-public.js";
+import { createQrLoginToken, consumeQrLoginToken, isAllowedQrBaseUrl } from "../lib/qr-login.js";
 
 const registerSchema = z.object({
   token: z.string().min(10),
@@ -48,7 +49,11 @@ authRoutes.get("/config", (c) => {
     { login: "integrator", password: process.env.INTEGRATOR_PASSWORD || process.env.DEMO_PASSWORD || "Integrator1234", name: "Интегратор" },
     { login: process.env.ADMIN_LOGIN || "admin", password: process.env.ADMIN_PASSWORD || "Admin1234", name: "Администратор" },
   ] : undefined;
-  return c.json({ demoLogin, demoUsers });
+  return c.json({
+    demoLogin,
+    demoUsers,
+    publicUrl: process.env.PUBLIC_URL || "http://localhost:5173",
+  });
 });
 
 authRoutes.get("/invite/verify", async (c) => {
@@ -194,6 +199,76 @@ authRoutes.post("/login", async (c) => {
   setCookie(c, getCookieName(), token, cookieOptions(secure));
 
   await writeAudit({ userId: authUser.id, userLogin: authUser.login, action: "auth.login", ip, userAgent: ua });
+
+  return c.json({ user: toApiUser(authUser) });
+});
+
+const qrCreateSchema = z.object({
+  baseUrl: z.string().url().optional(),
+});
+
+function corsOrigins() {
+  return (process.env.CORS_ORIGIN || "http://localhost:5173")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+}
+
+authRoutes.post("/qr/create", requireAuth, async (c) => {
+  const user = c.get("user");
+  const body = qrCreateSchema.safeParse(await c.req.json().catch(() => ({})));
+  const allowed = corsOrigins();
+  const fallback = process.env.PUBLIC_URL || allowed[0] || "http://localhost:5173";
+  const baseUrl = body.success && body.data.baseUrl ? body.data.baseUrl : fallback;
+  if (!isAllowedQrBaseUrl(baseUrl, allowed)) {
+    return c.json({ error: "Недопустимый адрес для QR-кода" }, 400);
+  }
+  const { token, expiresAt } = createQrLoginToken(user.id, user.login);
+  const url = `${baseUrl.replace(/\/$/, "")}/auth/qr?t=${encodeURIComponent(token)}`;
+  await writeAudit({
+    userId: user.id,
+    userLogin: user.login,
+    action: "auth.qr_create",
+    ip: getClientIp(c),
+    userAgent: c.req.header("user-agent"),
+  });
+  return c.json({ token, expiresAt, url });
+});
+
+authRoutes.post("/qr/accept", async (c) => {
+  const ip = getClientIp(c);
+  if (!rateLimit(`qr_accept:${ip}`, 20, 60_000)) {
+    return c.json({ error: "Слишком много попыток. Подождите минуту." }, 429);
+  }
+  const body = z.object({ token: z.string().min(10) }).safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid input" }, 400);
+
+  const consumed = consumeQrLoginToken(body.data.token);
+  if (!consumed) {
+    return c.json({ error: "QR-код истёк или уже использован" }, 401);
+  }
+
+  const authUser = await loadUser(consumed.userId);
+  if (!authUser) return c.json({ error: "Пользователь не найден" }, 401);
+  if (authUser.status === "pending") {
+    return c.json({ error: "Аккаунт ожидает подтверждения администратором", status: "pending" }, 403);
+  }
+  if (authUser.status === "rejected") {
+    return c.json({ error: "Регистрация отклонена", status: "rejected" }, 403);
+  }
+
+  const token = await signToken(authUser);
+  const secure = c.req.header("x-forwarded-proto") === "https";
+  setCookie(c, getCookieName(), token, cookieOptions(secure));
+
+  const ua = c.req.header("user-agent");
+  await writeAudit({
+    userId: authUser.id,
+    userLogin: authUser.login,
+    action: "auth.qr_login",
+    ip,
+    userAgent: ua,
+  });
 
   return c.json({ user: toApiUser(authUser) });
 });

@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: jbrealty
-      POSTGRES_PASSWORD: jbrealty
-      POSTGRES_DB: jbrealty
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm
+      POSTGRES_DB: crm
     ports:
       - "5432:5432"
     volumes:
-      - jbrealty_pg:/var/lib/postgresql/data
+      - crm_pg:/var/lib/postgresql/data
 
 volumes:
-  jbrealty_pg:
+  crm_pg:

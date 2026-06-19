@@ -1,0 +1,10 @@
+[Unit]
+Description=SDR CRM PD retention purge
+After=postgresql.service sdr-crm-api.service
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory=/var/www/sdr-crm/server
+EnvironmentFile=/var/www/sdr-crm/server/.env
+ExecStart=/usr/bin/node dist/jobs/retention-purge.js

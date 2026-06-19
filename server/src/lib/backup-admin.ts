@@ -6,7 +6,7 @@ import { isPglite } from "../db/index.js";
 
 const execFileAsync = promisify(execFile);
 
-const BACKUP_NAME_RE = /^jbrealty_\d{8}_\d{6}\.sql\.gz$/;
+const BACKUP_NAME_RE = /^crm_\d{8}_\d{6}\.sql\.gz$/;
 
 export type BackupConfig = {
   remoteEnabled: boolean;
@@ -31,11 +31,11 @@ export function backupConfigPath() {
 }
 
 function backupDir() {
-  return process.env.BACKUP_DIR || "/var/backups/jbrealty";
+  return process.env.BACKUP_DIR || "/var/backups/sdr-crm";
 }
 
 function backupScript(name: "backup-db.sh" | "backup-sync.sh") {
-  const root = process.env.JBREALTY_ROOT || path.join(process.cwd(), "..");
+  const root = process.env.SDR_CRM_ROOT || path.join(process.cwd(), "..");
   return process.env.BACKUP_SCRIPT_DIR
     ? path.join(process.env.BACKUP_SCRIPT_DIR, name)
     : path.join(root, "deploy/scripts", name);
@@ -117,7 +117,7 @@ export async function listBackups(): Promise<BackupListItem[]> {
 }
 
 async function readLogTail(lines = 20): Promise<string[]> {
-  const logFile = process.env.BACKUP_LOG_FILE || "/var/log/jbrealty/backup.log";
+  const logFile = process.env.BACKUP_LOG_FILE || "/var/log/sdr-crm/backup.log";
   try {
     const raw = await fs.readFile(logFile, "utf8");
     return raw.trim().split("\n").slice(-lines);
@@ -135,7 +135,7 @@ export async function getBackupStatus() {
   return {
     supported: backupSupported(),
     backupDir: backupDir(),
-    schedule: "Ежедневно в 03:00 (systemd jbrealty-backup.timer)",
+    schedule: "Ежедневно в 03:00 (systemd sdr-crm-backup.timer)",
     config,
     backups,
     latest: backups[0] || null,

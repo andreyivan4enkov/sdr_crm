@@ -1,8 +1,8 @@
 export const PRIVACY_POLICY = {
   version: "1.0",
   updatedAt: "2026-06-08",
-  operator: process.env.PD_OPERATOR_NAME || "ООО «JBrealty»",
-  operatorEmail: process.env.PD_OPERATOR_EMAIL || "privacy@jbrealty.ru",
+  operator: process.env.PD_OPERATOR_NAME || "ООО «SDR CRM»",
+  operatorEmail: process.env.PD_OPERATOR_EMAIL || "privacy@example.com",
   sections: [
     {
       title: "1. Общие положения",

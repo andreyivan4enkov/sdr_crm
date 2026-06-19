@@ -18,7 +18,7 @@ export let pgliteClient: any = null;
 if (usePglite) {
   const { PGlite } = await import("@electric-sql/pglite");
   const { drizzle } = await import("drizzle-orm/pglite");
-  const rawPath = process.env.PGLITE_PATH || "data/jbrealty";
+  const rawPath = process.env.PGLITE_PATH || "data/crm";
   const path = rawPath.startsWith("/")
     ? rawPath
     : resolve(serverRoot, rawPath.replace(/^\.\//, ""));

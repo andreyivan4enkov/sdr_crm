@@ -20,7 +20,7 @@ if [[ -f "$ENV_FILE" ]]; then
   source "$ENV_FILE"
 fi
 
-PGLITE_PATH="${PGLITE_PATH:-${ROOT}/server/data/jbrealty}"
+PGLITE_PATH="${PGLITE_PATH:-${ROOT}/server/data/crm}"
 if [[ "$PGLITE_PATH" != /* ]]; then
   PGLITE_PATH="${ROOT}/server/${PGLITE_PATH#./}"
 fi

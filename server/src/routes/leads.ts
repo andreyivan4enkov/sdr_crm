@@ -14,6 +14,10 @@ import { buildLeadExport, eraseLeadPersonalData, revokeLeadConsent } from "../li
 import { canAccessLead, canEditLead, leadScopeWhere, resolveLeadScope, resolveAssigneeFromRealtor, resolveAssigneeFromUser, sanitizeLeadPatchForUser } from "../lib/lead-access.js";
 import { formatLeadHistoryEntry, summarizeLeadPatch } from "../lib/lead-history.js";
 import { formatPhoneDisplay, isValidRuPhone } from "../lib/lead-phone.js";
+import { sdrConfig } from "../lib/sdr/config.js";
+import { leadSdrIndex, indexLeadAfterWrite } from "../lib/sdr/lead-index.js";
+import { leadFptmScoring } from "../lib/sdr/fptm-scoring.js";
+import { leadSdrGraph } from "../lib/sdr/lead-graph.js";
 
 const LEAD_HISTORY_HIDDEN = new Set(["lead.read", "lead.list"]);
 
@@ -57,17 +61,47 @@ leadRoutes.get("/", requirePermission("leads.read"), async (c) => {
   const user = c.get("user");
   const scope = await resolveLeadScope(user);
 
-  const searchCond = search
-    ? or(like(leads.name, `%${search}%`), like(leads.phone, `%${search}%`))
-    : undefined;
-  const whereCond = leadScopeWhere(scope, searchCond);
+  let rows: (typeof leads.$inferSelect)[] = [];
+  let total = 0;
+  let searchMode: "classic" | "sdr" | "sdr_fallback" = "classic";
 
-  const rows = whereCond
-    ? await db.select().from(leads).where(whereCond).orderBy(desc(leads.createdAt)).limit(limit).offset(offset)
-    : await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(limit).offset(offset);
-  const [countRow] = whereCond
-    ? await db.select({ count: sql<number>`count(*)::int` }).from(leads).where(whereCond)
-    : await db.select({ count: sql<number>`count(*)::int` }).from(leads);
+  if (sdrConfig.search && search?.trim() && leadSdrIndex.isReady()) {
+    const recalledIds = leadSdrIndex.search(search.trim());
+    if (recalledIds.length) {
+      searchMode = "sdr";
+      const idOrder = new Map(recalledIds.map((id, i) => [id, i]));
+      const searchCond = inArray(leads.id, recalledIds);
+      const whereCond = leadScopeWhere(scope, searchCond);
+      const matched = whereCond
+        ? await db.select().from(leads).where(whereCond)
+        : await db.select().from(leads).where(searchCond);
+      matched.sort((a: typeof leads.$inferSelect, b: typeof leads.$inferSelect) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999));
+      total = matched.length;
+      rows = matched.slice(offset, offset + limit);
+    }
+  }
+
+  if (!rows.length && search?.trim()) {
+    if (searchMode === "sdr") searchMode = "sdr_fallback";
+    const searchCond = or(like(leads.name, `%${search}%`), like(leads.phone, `%${search}%`));
+    const whereCond = leadScopeWhere(scope, searchCond);
+    rows = whereCond
+      ? await db.select().from(leads).where(whereCond).orderBy(desc(leads.createdAt)).limit(limit).offset(offset)
+      : await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(limit).offset(offset);
+    const [countRow] = whereCond
+      ? await db.select({ count: sql<number>`count(*)::int` }).from(leads).where(whereCond)
+      : await db.select({ count: sql<number>`count(*)::int` }).from(leads);
+    total = countRow?.count ?? 0;
+  } else if (!search?.trim()) {
+    const whereCond = leadScopeWhere(scope, undefined);
+    rows = whereCond
+      ? await db.select().from(leads).where(whereCond).orderBy(desc(leads.createdAt)).limit(limit).offset(offset)
+      : await db.select().from(leads).orderBy(desc(leads.createdAt)).limit(limit).offset(offset);
+    const [countRow] = whereCond
+      ? await db.select({ count: sql<number>`count(*)::int` }).from(leads).where(whereCond)
+      : await db.select({ count: sql<number>`count(*)::int` }).from(leads);
+    total = countRow?.count ?? 0;
+  }
 
   const allNotes = rows.length
     ? await db.select().from(leadNotes).where(inArray(leadNotes.leadId, rows.map((r: typeof leads.$inferSelect) => r.id)))
@@ -83,12 +117,12 @@ leadRoutes.get("/", requirePermission("leads.read"), async (c) => {
   await writeAudit({
     userId: user.id, userLogin: user.login, action: "lead.list",
     ip: getClientIp(c), userAgent: c.req.header("user-agent"),
-    meta: { page, limit, count: rows.length },
+    meta: { page, limit, count: rows.length, searchMode },
   });
 
   return c.json({
     leads: rows.map((l: typeof leads.$inferSelect) => ({ ...l, notes: notesByLead.get(l.id) || [] })),
-    total: countRow?.count ?? 0,
+    total,
     page,
     limit,
   });
@@ -158,6 +192,30 @@ leadRoutes.get("/:id/history", requirePermission("leads.read"), async (c) => {
     updatedAt: lead.updatedAt.toISOString(),
     events,
   });
+});
+
+leadRoutes.get("/:id/graph", requirePermission("leads.read"), async (c) => {
+  if (!sdrConfig.graph || !leadSdrGraph.isReady()) {
+    return c.json({ error: "SDR graph disabled" }, 404);
+  }
+  const id = c.req.param("id");
+  const access = await loadLeadForUser(c, id);
+  if ("error" in access) return access.error;
+  const hops = Math.min(5, Math.max(1, Number(c.req.query("hops") || 2)));
+  const nodes = leadSdrGraph.multiHop(id, hops);
+  return c.json({ leadId: id, hops, nodes });
+});
+
+leadRoutes.get("/:id/score", requirePermission("leads.read"), async (c) => {
+  if (!sdrConfig.scoring || !leadFptmScoring.isReady()) {
+    return c.json({ error: "SDR scoring disabled" }, 404);
+  }
+  const id = c.req.param("id");
+  const access = await loadLeadForUser(c, id);
+  if ("error" in access) return access.error;
+  const prediction = leadFptmScoring.predict(access.lead);
+  if (!prediction) return c.json({ error: "No prediction" }, 404);
+  return c.json({ prediction });
 });
 
 leadRoutes.get("/:id", requirePermission("leads.read"), async (c) => {
@@ -271,6 +329,14 @@ leadRoutes.post("/", requirePermission("leads.write"), async (c) => {
   }
 
   const full = await leadWithNotes(lead.id);
+  void indexLeadAfterWrite({
+    id: lead.id,
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email,
+    region: lead.region,
+    comment: lead.comment,
+  });
   await writeAudit({
     userId: user.id, userLogin: user.login, action: "lead.create",
     entityType: "lead", entityId: lead.id,
@@ -348,13 +414,30 @@ leadRoutes.patch("/:id", requirePermission("leads.read"), async (c) => {
 
   await db.update(leads).set({ ...patch, updatedAt: new Date() }).where(eq(leads.id, id));
   const full = await leadWithNotes(id);
+  let sdrPrediction = null;
+  if (full) {
+    void indexLeadAfterWrite({
+      id: full.id,
+      name: full.name,
+      phone: full.phone,
+      email: full.email,
+      region: full.region,
+      comment: full.comment,
+    });
+    if (newStatusId && newStatusId !== existing.statusId) {
+      sdrPrediction = leadFptmScoring.recordTransition(full, existing.statusId!, newStatusId);
+    }
+  }
   const auditCtx = await leadAuditContext();
   const changes = summarizeLeadPatch(patch, existing, auditCtx);
   await writeAudit({
     userId: user.id, userLogin: user.login, action: "lead.update",
     entityType: "lead", entityId: id,
     ip: getClientIp(c), userAgent: c.req.header("user-agent"),
-    meta: changes.length ? { changes } : undefined,
+    meta: {
+      ...(changes.length ? { changes } : {}),
+      ...(sdrPrediction ? { sdrStagePrediction: sdrPrediction } : {}),
+    },
   });
   broadcastToAll("lead_updated", { lead: full });
   return c.json({ lead: full });
@@ -404,6 +487,7 @@ leadRoutes.delete("/:id", requirePermission("leads.delete"), async (c) => {
   const access = await loadLeadForUser(c, id);
   if ("error" in access) return access.error;
   await db.delete(leads).where(eq(leads.id, id));
+  void leadSdrIndex.remove(id);
   const user = c.get("user");
   await writeAudit({
     userId: user.id, userLogin: user.login, action: "lead.delete",

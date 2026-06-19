@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Off-site копия бэкапов (rsync)
-# BACKUP_REMOTE=user@backup-host:/backups/jbrealty
+# BACKUP_REMOTE=user@backup-host:/backups/crm
 
 set -euo pipefail
 
@@ -8,10 +8,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/backup-common.sh
 source "${SCRIPT_DIR}/lib/backup-common.sh"
 
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/jbrealty}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/sdr-crm}"
 BACKUP_REMOTE="${BACKUP_REMOTE:-}"
-ENV_FILE="${ENV_FILE:-/var/www/jbrealty/server/.env}"
-BACKUP_LOG_FILE="${BACKUP_LOG_FILE:-/var/log/jbrealty/backup.log}"
+ENV_FILE="${ENV_FILE:-/var/www/sdr-crm/server/.env}"
+BACKUP_LOG_FILE="${BACKUP_LOG_FILE:-/var/log/sdr-crm/backup.log}"
 
 load_backup_config
 

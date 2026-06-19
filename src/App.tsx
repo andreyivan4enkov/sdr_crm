@@ -22,6 +22,8 @@ import { MobileCrmNav } from "./components/MobileCrmNav";
 import { MobileMoreSheet } from "./components/MobileMoreSheet";
 import { CrmNavSidebar } from "./components/CrmNavSidebar";
 import { MobileInstallGuide } from "./components/MobileInstallGuide";
+import { QrLoginShare } from "./components/QrLoginShare";
+import { AuthQrPage } from "./views/AuthQrPage";
 import { LeadCardFieldsGrid } from "./components/LeadCardFieldsGrid";
 import { LeadAssignSection } from "./components/LeadPeoplePicker";
 import { LeadHistoryTab } from "./components/LeadHistoryTab";
@@ -30,7 +32,9 @@ import { GlassDatePicker, GlassDateTimePicker, GlassPreferredTimePicker, formatP
 import { EmployeeAvatar, EmployeeChip } from "./components/EmployeeChip";
 import { leadResponsibleMember, uniqueWatcherMembers } from "./lib/team-members";
 import { TeamPage } from "./views/TeamPage";
-import { getTokens, loadThemePrefs, topBarBg, type ColorMode, type ThemeState } from "./theme";
+import { topBarBg } from "./theme";
+import { ThemeProvider, useTheme } from "./context/ThemeProvider";
+import { SequencerMode } from "./views/SequencerMode";
 import { buildCrmNav, CRM_NAV_LABELS, NAV_LAYOUT_KEY, type NavLayout } from "./lib/crm-nav";
 import {
   getStoredPipelineId, setStoredPipelineId, resolveActivePipeline,
@@ -46,7 +50,7 @@ import {
   PhoneCall, Sun, Moon, Bell, Columns, Tag, Type, Hash, Banknote, MapPinned,
   CalendarClock, Calendar, User, Zap, Plug, GripVertical, ListTodo, Check, Pencil, Globe, Eye,
   Megaphone, MessageCircle, Link2, Settings, List, BarChart3, SlidersHorizontal, ExternalLink,
-  ScrollText, Eraser, Download, PanelLeft, Menu, GitBranch, ArrowRightLeft, Copy, Mail,
+  ScrollText, Eraser, Download, PanelLeft, Menu, GitBranch, ArrowRightLeft, Copy, Mail, Radar, QrCode,
 } from "lucide-react";
 
 const now = () => new Date().toISOString();
@@ -79,9 +83,11 @@ const CHANNEL_ICONS = { site: Globe, messenger: MessageCircle, ad: Megaphone };
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppShell />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppShell />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }
@@ -92,7 +98,9 @@ function AppShell() {
   const navigate = useNavigate();
   const mode = location.pathname.startsWith("/crm") ? "crm" : "auth";
   const { data, loading: dataLoading, reload, reloadSilent, updateData, setData } = useCrmData(!!user);
-  const [theme, setTheme] = useState<ThemeState>({ colorMode: "light", brandOn: false });
+  const { theme, tokens: t, setColorMode, toggleBrand } = useTheme();
+  const [sequencerOpen, setSequencerOpen] = useState(false);
+  const [qrShareOpen, setQrShareOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [scrolled, setScrolled] = useState(false);
@@ -150,28 +158,10 @@ function AppShell() {
     return () => window.removeEventListener("scroll", h);
   }, []);
   useEffect(() => {
-    void loadThemePrefs(storageGet).then(setTheme);
     void storageGet(NAV_LAYOUT_KEY).then((v) => {
       if (v === "horizontal" || v === "vertical") setNavLayout(v);
     });
   }, []);
-
-  const t = getTokens(theme);
-
-  function setColorMode(colorMode: ColorMode) {
-    setTheme((prev) => {
-      const next = { ...prev, colorMode };
-      void storageSet("jbr:colorMode", colorMode);
-      return next;
-    });
-  }
-  function toggleBrand() {
-    setTheme((prev) => {
-      const next = { ...prev, brandOn: !prev.brandOn };
-      void storageSet("jbr:brand", next.brandOn ? "1" : "0");
-      return next;
-    });
-  }
   function setNavLayoutPref(layout: NavLayout) {
     setNavLayout(layout);
     void storageSet(NAV_LAYOUT_KEY, layout);
@@ -204,7 +194,7 @@ function AppShell() {
       window.dispatchEvent(new Event("crm:calls-refresh"));
     }
     if (event === "lead_created") {
-      const p = payload as { lead?: import("@jbrealty/api-client").Lead };
+      const p = payload as { lead?: import("@sdr-crm/api-client").Lead };
       if (p.lead) {
         const lead = normalizeLead(p.lead);
         setData((d) => d ? { ...d, leads: [lead, ...d.leads.filter((l) => l.id !== lead.id)] } : d);
@@ -213,7 +203,7 @@ function AppShell() {
       void reloadSilent();
     }
     if (event === "lead_updated") {
-      const p = payload as { lead?: import("@jbrealty/api-client").Lead };
+      const p = payload as { lead?: import("@sdr-crm/api-client").Lead };
       if (p.lead) {
         const lead = normalizeLead(p.lead);
         setData((d) => d ? { ...d, leads: d.leads.map((l) => l.id === lead.id ? lead : l) } : d);
@@ -329,13 +319,15 @@ function AppShell() {
   if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-stone-50 text-slate-400 text-sm">Загрузка…</div>;
 
   return (
-    <div data-crm-app data-brand={theme.brandOn ? "true" : undefined} data-color-mode={theme.colorMode} className={`min-h-screen transition-colors duration-300 overflow-x-hidden max-w-full ${t.app} ${t.text}`}>
+    <div data-crm-app data-brand={theme.brandOn ? "true" : undefined} data-color-mode={theme.colorMode} data-ui-skin={theme.uiSkin} className={`min-h-screen transition-colors duration-300 overflow-x-hidden max-w-full ${t.app} ${t.text}`}>
       <style>{scrollCss}</style>
       <TopBar t={t} theme={theme} scrolled={scrolled} mode={mode} user={user}
         onLogout={async () => { await logout(); navigate("/login"); }}
         setColorMode={setColorMode} toggleBrand={toggleBrand} notifs={notifs} setNotifs={setNotifs} openLead={openLead} openTask={openTask}
         crmView={crmView} setCrmView={goCrmView} nav={crmNav} navLayout={navLayout} setNavLayout={setNavLayoutPref}
         onOpenNavDrawer={() => setNavDrawerOpen(true)}
+        onOpenSequencer={() => setSequencerOpen(true)}
+        onOpenQrShare={() => setQrShareOpen(true)}
         navigate={navigate} />
 
       <div className="crm-app-shell">
@@ -343,6 +335,7 @@ function AppShell() {
         <Route path="/" element={user ? <Navigate to="/crm" replace /> : <Navigate to="/login" replace />} />
         <Route path="/privacy" element={<PrivacyPage t={t} />} />
         <Route path="/login" element={user ? <Navigate to="/crm" replace /> : <Login t={t} onSuccess={() => navigate("/crm")} />} />
+        <Route path="/auth/qr" element={<AuthQrPage t={t} />} />
         <Route path="/register" element={<RegisterPage t={t} Btn={Btn} TInput={TInput} Labeled={Labeled} />} />
         <Route path="/crm" element={
           user ? (
@@ -392,6 +385,8 @@ function AppShell() {
             onLayoutChange={setNavLayoutPref}
           />
           <MobileInstallGuide t={t} />
+          <SequencerMode open={sequencerOpen} onClose={() => setSequencerOpen(false)} data={data} />
+          <QrLoginShare open={qrShareOpen} onClose={() => setQrShareOpen(false)} t={t} userName={user?.name || user?.login} />
         </>
       )}
 
@@ -410,7 +405,7 @@ function AppShell() {
   );
 }
 
-function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggleBrand, notifs, setNotifs, openLead, openTask, crmView, setCrmView, nav, navLayout, setNavLayout, onOpenNavDrawer, navigate }) {
+function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggleBrand, notifs, setNotifs, openLead, openTask, crmView, setCrmView, nav, navLayout, setNavLayout, onOpenNavDrawer, onOpenSequencer, onOpenQrShare, navigate }) {
   const [bell, setBell] = useState(false);
   const isMobile = useIsMobile();
   const unread = notifs.filter((n) => !n.read).length;
@@ -446,7 +441,7 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
               draggable={false}
             />
             <div className="flex items-baseline gap-1 min-w-0 overflow-hidden">
-              <span className="hidden sm:inline font-bold text-sm md:text-base tracking-tight truncate">JBrealty</span>
+              <span className="hidden sm:inline font-bold text-sm md:text-base tracking-tight truncate">SDR CRM</span>
               <span className={`text-[10px] md:text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${t.chip}`}>
                 {isMobile && mode === "crm" ? (CRM_NAV_LABELS[crmView] || "CRM") : "CRM"}
               </span>
@@ -454,6 +449,26 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
           </button>
         </div>
         <div className="flex items-center gap-0.5 md:gap-2 shrink-0">
+          {mode === "crm" && user && (
+            <button
+              type="button"
+              title="QR-код для входа на телефоне"
+              onClick={onOpenQrShare}
+              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition shrink-0 ${t.hover}`}
+            >
+              <QrCode className="w-4 h-4" />
+            </button>
+          )}
+          {mode === "crm" && user && isMobile && (
+            <button
+              type="button"
+              title="Режим потока — радиальный секвенсор"
+              onClick={onOpenSequencer}
+              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition shrink-0 text-teal-600 dark:text-teal-400 ${t.hover}`}
+            >
+              <Radar className="w-4 h-4" />
+            </button>
+          )}
           {mode === "crm" && user && (
             <button
               type="button"
@@ -520,7 +535,7 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
               className={`w-7 h-7 rounded-md flex items-center justify-center transition ${theme.colorMode === "dark" ? `${t.surface} shadow-sm text-teal-500` : t.muted}`}>
               <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
-            <button type="button" title={theme.brandOn ? "Выключить корпоративные цвета" : "Включить корпоративные цвета JB Realty"} onClick={toggleBrand}
+            <button type="button" title={theme.brandOn ? "Выключить корпоративные цвета" : "Включить корпоративные цвета"} onClick={toggleBrand}
               className={`w-7 h-7 rounded-md flex items-center justify-center transition ${theme.brandOn ? `${t.surface} shadow-sm text-teal-500` : t.muted}`}>
               <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>

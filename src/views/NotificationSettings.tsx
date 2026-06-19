@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Bell, BellOff, RefreshCw, Smartphone } from "lucide-react";
-import type { NotificationPrefs } from "@jbrealty/api-client";
+import type { NotificationPrefs } from "@sdr-crm/api-client";
 import { api } from "../api/client";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 

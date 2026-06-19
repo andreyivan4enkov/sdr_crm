@@ -2,8 +2,8 @@ import type { ComponentType } from "react";
 import {
   BarChart3, Columns, ListTodo, PhoneCall, ScrollText, Settings, Users,
 } from "lucide-react";
-import type { AuthUser } from "@jbrealty/api-client";
-import { hasPermission } from "@jbrealty/api-client";
+import type { AuthUser } from "@sdr-crm/api-client";
+import { hasPermission } from "@sdr-crm/api-client";
 
 export type CrmNavItem = {
   k: string;

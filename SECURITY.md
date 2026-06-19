@@ -1,4 +1,4 @@
-# Безопасность JBrealty CRM
+# Безопасность SDR CRM
 
 ## Поддерживаемые версии
 
@@ -66,7 +66,7 @@ CORS_ORIGIN=https://crm.ваш-домен.ru
 PD_OPERATOR_EMAIL=privacy@example.ru
 DATABASE_URL=postgresql://...
 LOG_LEVEL=info
-LOG_FILE=/var/log/jbrealty/api.log
+LOG_FILE=/var/log/sdr-crm/api.log
 ```
 
 Демо-логины (`operator`/`admin`) **не создаются** в production seed.

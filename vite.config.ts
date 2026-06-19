@@ -7,12 +7,15 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@jbrealty/api-client": resolve(__dirname, "packages/api-client/src/index.ts"),
+      "@sdr-crm/api-client": resolve(__dirname, "packages/api-client/src/index.ts"),
+      "@sdr-crm/sdr-core": resolve(__dirname, "packages/sdr-core/src/index.ts"),
     },
   },
   server: {
+    host: true,
+    port: 5173,
     proxy: {
-      "/api": { target: "http://localhost:3000", changeOrigin: true },
+      "/api": { target: "http://127.0.0.1:3000", changeOrigin: true },
     },
   },
   build: {

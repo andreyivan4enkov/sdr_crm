@@ -1,1 +1,1 @@
-GRANT ALL ON TABLE "analytics_dashboards" TO jbrealty;
+GRANT ALL ON TABLE "analytics_dashboards" TO crm;

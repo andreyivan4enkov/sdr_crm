@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Восстановление PostgreSQL из .sql.gz бэкапа
-# Использование: ./restore-db.sh /var/backups/jbrealty/jbrealty_YYYYMMDD_HHMMSS.sql.gz
+# Использование: ./restore-db.sh /var/backups/sdr-crm/crm_YYYYMMDD_HHMMSS.sql.gz
 
 set -euo pipefail
 
@@ -8,8 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/backup-common.sh
 source "${SCRIPT_DIR}/lib/backup-common.sh"
 
-ENV_FILE="${ENV_FILE:-/var/www/jbrealty/server/.env}"
-BACKUP_LOG_FILE="${BACKUP_LOG_FILE:-/var/log/jbrealty/backup.log}"
+ENV_FILE="${ENV_FILE:-/var/www/sdr-crm/server/.env}"
+BACKUP_LOG_FILE="${BACKUP_LOG_FILE:-/var/log/sdr-crm/backup.log}"
 BACKUP_FILE="${1:-}"
 
 if [[ -z "$BACKUP_FILE" || ! -f "$BACKUP_FILE" ]]; then

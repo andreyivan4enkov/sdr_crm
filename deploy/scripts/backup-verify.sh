@@ -7,8 +7,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/backup-common.sh
 source "${SCRIPT_DIR}/lib/backup-common.sh"
 
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/jbrealty}"
-BACKUP_LOG_FILE="${BACKUP_LOG_FILE:-/var/log/jbrealty/backup.log}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/sdr-crm}"
+BACKUP_LOG_FILE="${BACKUP_LOG_FILE:-/var/log/sdr-crm/backup.log}"
 TARGET="${1:-latest}"
 
 mkdir -p "$(dirname "$BACKUP_LOG_FILE")"
@@ -23,7 +23,7 @@ resolve_file() {
       return
     fi
     local newest
-    newest="$(find "$BACKUP_DIR" -maxdepth 1 -name 'jbrealty_*.sql.gz' -type f | sort -r | head -1)"
+    newest="$(find "$BACKUP_DIR" -maxdepth 1 -name 'crm_*.sql.gz' -type f | sort -r | head -1)"
     echo "$newest"
     return
   fi

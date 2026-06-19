@@ -51,7 +51,7 @@ function write(level: LogLevel, message: string, fields?: Record<string, unknown
   const entry = {
     ts: new Date().toISOString(),
     level,
-    service: "jbrealty-api",
+    service: "sdr-crm-api",
     msg: message,
     ...(fields ? redactObject(fields) : {}),
   };
@@ -72,7 +72,7 @@ function write(level: LogLevel, message: string, fields?: Record<string, unknown
       console.error(JSON.stringify({
         ts: new Date().toISOString(),
         level: "error",
-        service: "jbrealty-api",
+        service: "sdr-crm-api",
         msg: "Failed to write LOG_FILE",
         err: serializeError(e),
       }));

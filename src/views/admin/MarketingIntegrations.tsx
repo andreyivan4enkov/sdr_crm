@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BarChart3, Copy, Megaphone, MessageCircle, Power, RefreshCw, ShoppingBag, Check } from "lucide-react";
 import { api } from "../../api/client";
-import type { Integration } from "@jbrealty/api-client";
+import type { Integration } from "@sdr-crm/api-client";
 
 type BtnProps = { children: React.ReactNode; onClick: () => void; t: Record<string, string>; variant?: string; className?: string };
 
@@ -246,10 +246,10 @@ export function MarketingIntegrations({ t, Btn, onSaved }: { t: Record<string, s
           <h3 className="font-semibold flex items-center gap-2 text-sm"><BarChart3 className="w-4 h-4 text-red-600" /> Яндекс Метрика</h3>
           <StatusBadge enabled={state.yandex_metrica.enabled} />
         </div>
-        <p className={`text-xs ${t.muted} mt-1`}>Счётчик на jbrealty.ru. OAuth-токен — для API отчётов (опционально).</p>
+        <p className={`text-xs ${t.muted} mt-1`}>Счётчик на example.com. OAuth-токен — для API отчётов (опционально).</p>
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           {field("yandex_metrica", "counterId", "Номер счётчика")}
-          {field("yandex_metrica", "siteUrl", "Сайт", "https://jbrealty.ru")}
+          {field("yandex_metrica", "siteUrl", "Сайт", "https://example.com")}
           {field("yandex_metrica", "oauthToken", "OAuth-токен API", "y0_…")}
         </div>
         {state.yandex_metrica.counterId && (

@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import { X, Users, Settings, ScrollText, Smartphone, Phone } from "lucide-react";
-import type { AuthUser } from "@jbrealty/api-client";
-import { hasPermission } from "@jbrealty/api-client";
+import type { AuthUser } from "@sdr-crm/api-client";
+import { hasPermission } from "@sdr-crm/api-client";
 
 type NavItem = { k: string; label: string; icon: ComponentType<{ className?: string }> };
 

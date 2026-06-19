@@ -7,7 +7,7 @@ const META_KEYS = new Set([
 
 const CRM_STANDARD = new Set(["name", "phone", "email", "comment", "region", "preferredTime"]);
 
-/** Варианты имён полей на jbrealty.ru и типичных форм Tilda */
+/** Варианты имён полей на example.com и типичных форм Tilda */
 const ALIASES: Record<string, string[]> = {
   name: ["name", "Name", "имя", "Имя", "fullname", "Fullname", "fio", "Fio", "your_name"],
   phone: ["phone", "Phone", "tel", "Tel", "телефон", "Телефон", "mobile", "Mobile"],

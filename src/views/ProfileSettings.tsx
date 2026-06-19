@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Building2, Camera, MapPin, Phone, Save, User } from "lucide-react";
-import type { MyProfilePayload } from "@jbrealty/api-client";
+import type { MyProfilePayload } from "@sdr-crm/api-client";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { readAvatarFile } from "../lib/avatar-upload";

@@ -1,0 +1,7 @@
+[Unit]
+Description=SDR CRM backup failure alert
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/var/www/sdr-crm/server/.env
+ExecStart=/bin/bash -c 'curl -sf -X POST "${BACKUP_ALERT_WEBHOOK}" -H "Content-Type: application/json" -d "{\"text\":\"SDR CRM: daily backup FAILED\"}" || true'

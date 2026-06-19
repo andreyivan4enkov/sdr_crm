@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Globe, Phone, Copy, RefreshCw, Shield, Code, Check, Link2, Power, Sparkles } from "lucide-react";
 import { api } from "../../api/client";
-import type { Integration, IntegrationEndpoints } from "@jbrealty/api-client";
+import type { Integration, IntegrationEndpoints } from "@sdr-crm/api-client";
 
 const PROVIDERS = [
   { id: "beeline", label: "Билайн бизнес", hint: "Облачная АТС cloudpbx.beeline.ru — XSI Events, записи, исходящие" },
@@ -255,7 +255,7 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
       <div className={`bio-card bio-glass-panel p-4 ${t.surface} border-amber-300/50`}>
         <h3 className="font-semibold flex items-center gap-2 text-sm"><Shield className="w-4 h-4 text-amber-600" /> 152-ФЗ</h3>
         <ul className={`text-xs ${t.subtle} mt-2 space-y-1 list-disc pl-4`}>
-          <li>Tilda: чекбокс <code>pd_consent</code> в форме jbrealty.ru</li>
+          <li>Tilda: чекбокс <code>pd_consent</code> в форме example.com</li>
           <li>Запись звонков — отдельное согласие в политике</li>
           <li>Договор поручения с Tilda и оператором связи</li>
         </ul>
@@ -264,7 +264,7 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
       {/* TILDA */}
       <div className={`bio-card bio-glass-panel p-5 ${t.surface} ${t.border}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold flex items-center gap-2"><Globe className="w-4 h-4 text-teal-600" /> Tilda · jbrealty.ru</h3>
+          <h3 className="font-semibold flex items-center gap-2"><Globe className="w-4 h-4 text-teal-600" /> Tilda · example.com</h3>
           <StatusBadge enabled={tildaEnabled} />
         </div>
         <p className={`text-sm ${t.muted} mt-1`}>Скопируйте ссылку ниже → Tilda → <strong>Настройки сайта → Формы → Webhook</strong> → вставьте → опубликуйте сайт</p>
@@ -292,7 +292,7 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
           <summary className={`text-xs ${t.muted} cursor-pointer hover:text-teal-600`}>Маппинг полей (обычно менять не нужно)</summary>
           <textarea value={mapping} onChange={(e) => setMapping(e.target.value)} rows={6}
             className={`w-full mt-2 rounded-lg border px-3 py-2 text-sm font-mono ${t.input}`} />
-          <p className={`text-xs ${t.muted} mt-1`}>Поля jbrealty.ru: Name, Phone, Date. Согласие: pd_consent</p>
+          <p className={`text-xs ${t.muted} mt-1`}>Поля example.com: Name, Phone, Date. Согласие: pd_consent</p>
         </details>
       </div>
 

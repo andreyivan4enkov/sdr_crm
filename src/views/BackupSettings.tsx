@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CloudUpload, Database, Download, HardDrive, RefreshCw, Save } from "lucide-react";
-import type { BackupConfig, BackupStatus } from "@jbrealty/api-client";
+import type { BackupConfig, BackupStatus } from "@sdr-crm/api-client";
 import { api } from "../api/client";
 
 type BtnProps = {
@@ -173,13 +173,13 @@ export function BackupSettings({
 
           <Labeled t={t} label="Адрес rsync">
             <p className={`text-xs ${t.muted} mb-1`}>
-              Формат: user@host:/path/to/backups/jbrealty — на сервере CRM должен быть SSH-ключ
+              Формат: user@host:/path/to/backups/crm — на сервере CRM должен быть SSH-ключ
             </p>
             <TInput
               t={t}
               value={config.remoteUrl}
               onChange={(v) => setConfig({ ...config, remoteUrl: v })}
-              placeholder="backup@storage.example:/backups/jbrealty"
+              placeholder="backup@storage.example:/backups/crm"
             />
           </Labeled>
 

@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-ROOT="${1:-/var/www/jbrealty}"
+ROOT="${1:-/var/www/sdr-crm}"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "skip: install-ops.sh только для Linux VPS (systemd, www-data)."
@@ -21,25 +21,25 @@ if ! getent group www-data >/dev/null 2>&1; then
   exit 1
 fi
 
-mkdir -p /var/log/jbrealty /var/backups/jbrealty "${ROOT}/server/data"
-chown www-data:www-data /var/log/jbrealty /var/backups/jbrealty "${ROOT}/server/data"
-chmod 750 /var/backups/jbrealty
+mkdir -p /var/log/sdr-crm /var/backups/sdr-crm "${ROOT}/server/data"
+chown www-data:www-data /var/log/sdr-crm /var/backups/sdr-crm "${ROOT}/server/data"
+chmod 750 /var/backups/sdr-crm
 
 chmod +x "${ROOT}/deploy/scripts/"*.sh
 chmod +x "${ROOT}/deploy/scripts/lib/"*.sh 2>/dev/null || true
 
-cp "${ROOT}/deploy/systemd/jbrealty-backup.service" /etc/systemd/system/
-cp "${ROOT}/deploy/systemd/jbrealty-backup.timer" /etc/systemd/system/
-cp "${ROOT}/deploy/systemd/jbrealty-backup-alert.service" /etc/systemd/system/
-cp "${ROOT}/deploy/systemd/jbrealty-retention.service" /etc/systemd/system/
-cp "${ROOT}/deploy/systemd/jbrealty-retention.timer" /etc/systemd/system/
+cp "${ROOT}/deploy/systemd/sdr-crm-backup.service" /etc/systemd/system/
+cp "${ROOT}/deploy/systemd/sdr-crm-backup.timer" /etc/systemd/system/
+cp "${ROOT}/deploy/systemd/sdr-crm-backup-alert.service" /etc/systemd/system/
+cp "${ROOT}/deploy/systemd/sdr-crm-retention.service" /etc/systemd/system/
+cp "${ROOT}/deploy/systemd/sdr-crm-retention.timer" /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now jbrealty-backup.timer
-systemctl enable --now jbrealty-retention.timer
+systemctl enable --now sdr-crm-backup.timer
+systemctl enable --now sdr-crm-retention.timer
 
 if [[ -d /etc/logrotate.d ]]; then
-  cp "${ROOT}/deploy/logrotate/jbrealty" /etc/logrotate.d/jbrealty
+  cp "${ROOT}/deploy/logrotate/crm" /etc/logrotate.d/crm
 fi
 
-echo "OK: backup timer enabled (03:00 daily), logs in /var/log/jbrealty"
-systemctl list-timers jbrealty-backup.timer --no-pager
+echo "OK: backup timer enabled (03:00 daily), logs in /var/log/sdr-crm"
+systemctl list-timers sdr-crm-backup.timer --no-pager

@@ -1,6 +1,6 @@
 import type {
   AnalyticsGoal, AnalyticsKpiMetric, Call, Channel, Field, GoalOperator, Lead, Stage, Task,
-} from "@jbrealty/api-client";
+} from "@sdr-crm/api-client";
 
 export type AnalyticsData = {
   leads: Lead[];
@@ -157,4 +157,14 @@ export function metricNeedsStage(metric: AnalyticsKpiMetric) {
 
 export function metricNeedsField(metric: AnalyticsKpiMetric) {
   return metric === "money_sum";
+}
+
+export type FunnelCaMetric = {
+  stability: number;
+  density: number;
+  bottleneck: number;
+};
+
+export function formatFunnelCaMetric(metric: FunnelCaMetric): string {
+  return `Стабильность ${(metric.stability * 100).toFixed(0)}% · Плотность ${(metric.density * 100).toFixed(0)}%`;
 }

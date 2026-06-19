@@ -83,7 +83,7 @@ html {
   user-select: none;
 }
 
-/* Корпоративный акцент JB Realty (jbrealty.ru): коралловый #ff8b6a поверх teal-классов */
+/* Корпоративный акцент JB Realty (example.com): коралловый #ff8b6a поверх teal-классов */
 [data-brand="true"] .text-teal-200,
 [data-brand="true"] .text-teal-300,
 [data-brand="true"] .text-teal-400,
@@ -932,4 +932,156 @@ html {
     min-height: 2.25rem;
     font-size: 0.8125rem;
   }
+}
+
+@keyframes sequencer-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes sequencer-burst {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(3.5);
+    opacity: 0;
+  }
+}
+
+.sequencer-burst {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(79, 168, 119, 0.55), transparent 70%);
+  animation: sequencer-burst 1.2s ease-out forwards;
+  pointer-events: none;
+}
+
+.sequencer-screen,
+.sequencer-screen .sequencer-motor {
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+
+.sequencer-screen .sequencer-motor {
+  isolation: isolate;
+}
+
+[data-ui-skin="neomorphism"] [data-crm-app] {
+  --neo-bg: #e9e5df;
+  --neo-s-light: #ffffff;
+  --neo-s-dark: #c8c2b7;
+  --neo-text: #36322b;
+  --neo-muted: #8c857a;
+  --neo-subtle: #b7afa3;
+  --neo-track: #dcd7ce;
+  font-family: "Manrope", system-ui, sans-serif;
+}
+
+[data-ui-skin="neomorphism"][data-color-mode="dark"] [data-crm-app] {
+  --neo-bg: #25272c;
+  --neo-s-light: #33363d;
+  --neo-s-dark: #1a1b1f;
+  --neo-text: #eceae5;
+  --neo-muted: #8e919a;
+  --neo-subtle: #5c606a;
+  --neo-track: #2c2e34;
+}
+
+[data-ui-skin="neomorphism"] .neo-app {
+  background: var(--neo-bg) !important;
+  color: var(--neo-text);
+}
+
+[data-ui-skin="neomorphism"] .neo-text { color: var(--neo-text); }
+[data-ui-skin="neomorphism"] .neo-muted { color: var(--neo-muted); }
+[data-ui-skin="neomorphism"] .neo-subtle { color: var(--neo-subtle); }
+[data-ui-skin="neomorphism"] .neo-soft { background: var(--neo-bg); }
+[data-ui-skin="neomorphism"] .neo-board { background: color-mix(in srgb, var(--neo-bg) 88%, var(--neo-s-dark)); }
+[data-ui-skin="neomorphism"] .neo-divide { border-color: var(--neo-track); }
+
+[data-ui-skin="neomorphism"] .neo-surface {
+  background: var(--neo-bg);
+  border: none;
+  box-shadow: 6px 6px 14px var(--neo-s-dark), -6px -6px 14px var(--neo-s-light);
+}
+
+[data-ui-skin="neomorphism"] .neo-border {
+  border: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--neo-s-dark) 25%, transparent);
+}
+
+[data-ui-skin="neomorphism"] .neo-chip {
+  background: var(--neo-bg);
+  color: var(--neo-text);
+  box-shadow: inset 3px 3px 7px var(--neo-s-dark), inset -3px -3px 7px var(--neo-s-light);
+  border: none;
+}
+
+[data-ui-skin="neomorphism"] .neo-input {
+  background: var(--neo-bg);
+  color: var(--neo-text);
+  border: none;
+  box-shadow: inset 4px 4px 9px var(--neo-s-dark), inset -4px -4px 9px var(--neo-s-light);
+}
+
+[data-ui-skin="neomorphism"] .neo-hover:hover {
+  box-shadow: 8px 8px 18px var(--neo-s-dark), -8px -8px 18px var(--neo-s-light);
+}
+
+[data-ui-skin="neomorphism"] .neo-topbar {
+  background: color-mix(in srgb, var(--neo-bg) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: none !important;
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--neo-s-dark) 35%, transparent);
+}
+
+[data-ui-skin="neomorphism"] .neo-topbar--scrolled {
+  background: color-mix(in srgb, var(--neo-bg) 78%, transparent);
+}
+
+[data-ui-skin="neomorphism"] .md\:hidden.fixed.bottom-0 nav,
+[data-ui-skin="neomorphism"] nav[aria-label="Навигация CRM"] {
+  background: color-mix(in srgb, var(--neo-bg) 95%, transparent) !important;
+  border-top: none !important;
+  box-shadow: 0 -4px 18px color-mix(in srgb, var(--neo-s-dark) 30%, transparent);
+}
+
+[data-ui-skin="neomorphism"] [data-crm-app] button.rounded-xl,
+[data-ui-skin="neomorphism"] [data-crm-app] button.rounded-2xl,
+[data-ui-skin="neomorphism"] [data-crm-app] .rounded-2xl.border {
+  border: none !important;
+}
+
+[data-ui-skin="neomorphism"] [data-crm-app] .rounded-2xl.border.shadow-sm {
+  background: var(--neo-bg);
+  box-shadow: 6px 6px 14px var(--neo-s-dark), -6px -6px 14px var(--neo-s-light);
+}
+
+[data-ui-skin="neomorphism"] [data-crm-app] input,
+[data-ui-skin="neomorphism"] [data-crm-app] textarea,
+[data-ui-skin="neomorphism"] [data-crm-app] select {
+  background: var(--neo-bg) !important;
+  border: none !important;
+  box-shadow: inset 3px 3px 8px var(--neo-s-dark), inset -3px -3px 8px var(--neo-s-light);
+  color: var(--neo-text);
+}
+
+[data-ui-skin="neomorphism"] [data-crm-app] .text-teal-600,
+[data-ui-skin="neomorphism"] [data-crm-app] .text-teal-500 {
+  color: #4e8c86 !important;
+}
+
+[data-ui-skin="neomorphism"] [data-crm-app] .bg-teal-500,
+[data-ui-skin="neomorphism"] [data-crm-app] .bg-teal-600 {
+  background: #4e8c86 !important;
 }

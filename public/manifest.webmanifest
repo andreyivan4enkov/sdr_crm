@@ -1,7 +1,7 @@
 {
-  "name": "JBrealty CRM",
-  "short_name": "JBrealty",
-  "description": "CRM для риэлторского агентства JBrealty",
+  "name": "SDR CRM",
+  "short_name": "SDR CRM",
+  "description": "CRM для риэлторского агентства SDR CRM",
   "start_url": "/crm",
   "scope": "/",
   "display": "standalone",

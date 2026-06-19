@@ -36,7 +36,7 @@ chown www-data:www-data "${ROOT}/server/data" 2>/dev/null || true
 
 echo "==> Restarting API"
 if command -v systemctl >/dev/null 2>&1; then
-  systemctl restart jbrealty-api || echo "Start manually: node server/dist/index.js"
+  systemctl restart sdr-crm-api || echo "Start manually: node server/dist/index.js"
 else
   echo "Start manually: node server/dist/index.js"
 fi

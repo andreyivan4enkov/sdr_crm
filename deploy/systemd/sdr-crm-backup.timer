@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily JBrealty CRM database backup
+Description=Daily SDR CRM database backup
 
 [Timer]
 OnCalendar=*-*-* 03:00:00

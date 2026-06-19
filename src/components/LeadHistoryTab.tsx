@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { History, Loader2 } from "lucide-react";
-import type { LeadHistoryEvent } from "@jbrealty/api-client";
+import type { LeadHistoryEvent } from "@sdr-crm/api-client";
 import { api } from "../api/client";
 
 function formatWhen(iso: string) {

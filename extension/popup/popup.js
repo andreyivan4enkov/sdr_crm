@@ -1,5 +1,5 @@
 /**
- * Для продакшена: соберите popup с @jbrealty/api-client (createApiClient).
+ * Для продакшена: соберите popup с @sdr-crm/api-client (createApiClient).
  * Сейчас — минимальная проверка связи с API.
  */
 const $ = (id) => document.getElementById(id);

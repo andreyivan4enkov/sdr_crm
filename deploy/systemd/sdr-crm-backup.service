@@ -1,0 +1,17 @@
+[Unit]
+Description=SDR CRM PostgreSQL backup
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=-/var/www/sdr-crm/server/.env
+Environment=BACKUP_DIR=/var/backups/sdr-crm
+Environment=BACKUP_LOG_FILE=/var/log/sdr-crm/backup.log
+Environment=ENV_FILE=/var/www/sdr-crm/server/.env
+Environment=BACKUP_CONFIG=/var/www/sdr-crm/server/data/backup-config.json
+Environment=LOCK_FILE=/var/run/sdr-crm-backup.lock
+ExecStart=/var/www/sdr-crm/deploy/scripts/backup-db.sh
+ExecStartPost=/var/www/sdr-crm/deploy/scripts/backup-verify.sh latest
+OnFailure=sdr-crm-backup-alert.service

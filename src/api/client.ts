@@ -1,15 +1,15 @@
-import { createApiClient, hasAnyPermission, hasPermission, normalizeLead, canEditLead, canAssignLead } from "@jbrealty/api-client";
-import type * as ApiTypes from "@jbrealty/api-client";
+import { createApiClient, hasAnyPermission, hasPermission, normalizeLead, canEditLead, canAssignLead } from "@sdr-crm/api-client";
+import type * as ApiTypes from "@sdr-crm/api-client";
 
 export type {
   AdminUser, AuditLog, AuthUser, Automation, Call, Channel, Field, Integration,
   Lead, Note, OrgUnit, Profile, Realtor, Role, Stage, Task, TeamPayload, TeamUser,
-} from "@jbrealty/api-client";
+} from "@sdr-crm/api-client";
 
 export { hasPermission, hasAnyPermission, normalizeLead, canEditLead, canAssignLead };
 export {
   PERMISSION_LABELS, PERMISSION_GROUPS, permissionLabel, isFullAccess,
-} from "@jbrealty/api-client";
+} from "@sdr-crm/api-client";
 
 const base = createApiClient();
 

@@ -8,4 +8,4 @@ CREATE TABLE IF NOT EXISTS "analytics_dashboards" (
   "updated_at" timestamp with time zone NOT NULL DEFAULT now()
 );
 
-GRANT ALL ON TABLE "analytics_dashboards" TO jbrealty;
+GRANT ALL ON TABLE "analytics_dashboards" TO crm;

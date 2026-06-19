@@ -1,6 +1,7 @@
 import { db } from "../db/index.js";
 import { auditLog } from "../db/schema.js";
 import { logger } from "./logger.js";
+import { scoreAuditSurprisal } from "./sdr/audit-surprisal.js";
 
 export type AuditAction =
   | "auth.login"
@@ -48,6 +49,12 @@ export async function writeAudit(opts: {
   userAgent?: string;
   meta?: Record<string, unknown>;
 }) {
+  const surprisal = scoreAuditSurprisal(opts.action, opts.meta);
+  const meta = { ...(opts.meta || {}) };
+  if (surprisal) {
+    meta.surprisalBits = surprisal.surprisalBits;
+    if (surprisal.anomaly) meta.anomaly = true;
+  }
   try {
     await db.insert(auditLog).values({
       userId: opts.userId || null,
@@ -57,7 +64,7 @@ export async function writeAudit(opts: {
       entityId: opts.entityId || null,
       ip: opts.ip || null,
       userAgent: opts.userAgent?.slice(0, 512) || null,
-      meta: opts.meta || {},
+      meta,
     });
   } catch (e) {
     logger.logError(e, "audit.write_failed");

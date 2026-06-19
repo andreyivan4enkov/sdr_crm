@@ -1,4 +1,4 @@
-/** Корпоративная палитра с https://jbrealty.ru/ */
+/** Корпоративная палитра с https://example.com/ */
 export const JB_BRAND = {
   accent: "#ff8b6a",
   accentHover: "#f07858",
@@ -13,30 +13,37 @@ export const JB_BRAND = {
 } as const;
 
 export type ColorMode = "light" | "dark";
+export type UiSkin = "standard" | "neomorphism";
 
 export type ThemeState = {
   colorMode: ColorMode;
   brandOn: boolean;
+  uiSkin: UiSkin;
 };
 
 /** @deprecated legacy single-key theme */
 export type ThemePref = "light" | "dark" | "brand";
 
 export function migrateLegacyTheme(stored: string | null | undefined): ThemeState {
-  if (stored === "dark") return { colorMode: "dark", brandOn: false };
-  if (stored === "brand" || stored === "auto") return { colorMode: "light", brandOn: true };
-  return { colorMode: "light", brandOn: false };
+  if (stored === "dark") return { colorMode: "dark", brandOn: false, uiSkin: "standard" };
+  if (stored === "brand" || stored === "auto") return { colorMode: "light", brandOn: true, uiSkin: "standard" };
+  return { colorMode: "light", brandOn: false, uiSkin: "standard" };
 }
 
 export async function loadThemePrefs(
   get: (key: string) => Promise<string | null>,
 ): Promise<ThemeState> {
-  const [colorMode, brand] = await Promise.all([get("jbr:colorMode"), get("jbr:brand")]);
+  const [colorMode, brand, uiSkin] = await Promise.all([
+    get("jbr:colorMode"),
+    get("jbr:brand"),
+    get("sdr:uiSkin"),
+  ]);
+  const skin: UiSkin = uiSkin === "neomorphism" ? "neomorphism" : "standard";
   if (colorMode === "light" || colorMode === "dark") {
-    return { colorMode, brandOn: brand === "1" || brand === "true" };
+    return { colorMode, brandOn: brand === "1" || brand === "true", uiSkin: skin };
   }
   const legacy = await get("jbr:theme");
-  return migrateLegacyTheme(legacy);
+  return { ...migrateLegacyTheme(legacy), uiSkin: skin };
 }
 
 export type ThemeTokens = {
@@ -54,7 +61,39 @@ export type ThemeTokens = {
   divide: string;
 };
 
-export function getTokens({ colorMode, brandOn }: ThemeState): ThemeTokens {
+export function getTokens({ colorMode, brandOn, uiSkin }: ThemeState): ThemeTokens {
+  if (uiSkin === "neomorphism") {
+    if (colorMode === "dark") {
+      return {
+        app: "neo-app",
+        surface: "neo-surface",
+        soft: "neo-soft",
+        border: "neo-border",
+        text: "neo-text",
+        muted: "neo-muted",
+        subtle: "neo-subtle",
+        input: "neo-input",
+        hover: "neo-hover",
+        chip: "neo-chip",
+        board: "neo-board",
+        divide: "neo-divide",
+      };
+    }
+    return {
+      app: "neo-app",
+      surface: "neo-surface",
+      soft: "neo-soft",
+      border: "neo-border",
+      text: "neo-text",
+      muted: "neo-muted",
+      subtle: "neo-subtle",
+      input: "neo-input",
+      hover: "neo-hover",
+      chip: "neo-chip",
+      board: "neo-board",
+      divide: "neo-divide",
+    };
+  }
   if (colorMode === "dark") {
     return {
       app: "bg-slate-900",
@@ -103,7 +142,11 @@ export function getTokens({ colorMode, brandOn }: ThemeState): ThemeTokens {
   };
 }
 
-export function topBarBg({ colorMode, brandOn }: ThemeState, scrolled: boolean): string {
+export function topBarBg(theme: ThemeState, scrolled: boolean): string {
+  if (theme.uiSkin === "neomorphism") {
+    return scrolled ? "neo-topbar neo-topbar--scrolled" : "neo-topbar";
+  }
+  const { colorMode, brandOn } = theme;
   if (colorMode === "dark") return scrolled ? "bg-slate-900/50" : "bg-slate-900/90";
   if (brandOn) return scrolled ? "bg-white/85" : "bg-white/95";
   return scrolled ? "bg-white/55" : "bg-white/90";

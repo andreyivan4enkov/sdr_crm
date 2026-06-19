@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Общие функции для скриптов резервного копирования JBrealty CRM
+# Общие функции для скриптов резервного копирования SDR CRM
 
 backup_log() {
   local level="$1"
@@ -10,7 +10,7 @@ backup_log() {
     extra="$(printf '%s' "$*" | sed 's/"/\\"/g')"
     extra=", \"detail\": \"${extra}\""
   fi
-  local line="{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"level\":\"${level}\",\"service\":\"jbrealty-backup\",\"msg\":\"${msg}\"${extra}}"
+  local line="{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"level\":\"${level}\",\"service\":\"sdr-crm-backup\",\"msg\":\"${msg}\"${extra}}"
   echo "$line"
   if [[ -n "${BACKUP_LOG_FILE:-}" ]]; then
     echo "$line" >> "$BACKUP_LOG_FILE"
@@ -42,7 +42,7 @@ load_env() {
 
 # Настройки из CRM (server/data/backup-config.json)
 load_backup_config() {
-  local cfg="${BACKUP_CONFIG:-/var/www/jbrealty/server/data/backup-config.json}"
+  local cfg="${BACKUP_CONFIG:-/var/www/sdr-crm/server/data/backup-config.json}"
   [[ -f "$cfg" ]] || return 0
   if ! command -v node >/dev/null 2>&1; then
     backup_log_warn "backup.config_no_node" "$cfg"
@@ -134,7 +134,7 @@ send_backup_alert() {
   if [[ -n "${BACKUP_ALERT_WEBHOOK:-}" ]]; then
     curl -sf -X POST "$BACKUP_ALERT_WEBHOOK" \
       -H "Content-Type: application/json" \
-      -d "{\"text\":\"JBrealty backup: ${msg}\"}" >/dev/null 2>&1 || true
+      -d "{\"text\":\"SDR CRM backup: ${msg}\"}" >/dev/null 2>&1 || true
   fi
 }
 
@@ -143,8 +143,8 @@ prune_old_backups() {
   local retention_days="$2"
   (
     cd "$backup_dir" || exit 0
-    find . -maxdepth 1 -name 'jbrealty_*.sql.gz' -mtime +"$retention_days" -delete
-    find . -maxdepth 1 -name 'jbrealty_*.sql.gz.sha256' -mtime +"$retention_days" -delete
-    find . -maxdepth 1 -name 'jbrealty_*.meta.json' -mtime +"$retention_days" -delete
+    find . -maxdepth 1 -name 'crm_*.sql.gz' -mtime +"$retention_days" -delete
+    find . -maxdepth 1 -name 'crm_*.sql.gz.sha256' -mtime +"$retention_days" -delete
+    find . -maxdepth 1 -name 'crm_*.meta.json' -mtime +"$retention_days" -delete
   )
 }

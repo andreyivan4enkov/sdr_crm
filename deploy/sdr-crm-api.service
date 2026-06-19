@@ -1,5 +1,5 @@
 [Unit]
-Description=JBrealty CRM API
+Description=SDR CRM API
 After=network.target postgresql.service
 Wants=postgresql.service
 
@@ -7,22 +7,22 @@ Wants=postgresql.service
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/jbrealty/server
-EnvironmentFile=/var/www/jbrealty/server/.env
+WorkingDirectory=/var/www/sdr-crm/server
+EnvironmentFile=/var/www/sdr-crm/server/.env
 Environment=LOG_LEVEL=info
-Environment=LOG_FILE=/var/log/jbrealty/api.log
+Environment=LOG_FILE=/var/log/sdr-crm/api.log
 ExecStart=/usr/bin/node dist/index.js
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=jbrealty-api
+SyslogIdentifier=sdr-crm-api
 
 # Безопасность
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log/jbrealty /var/www/jbrealty/server/data /var/backups/jbrealty
+ReadWritePaths=/var/log/sdr-crm /var/www/sdr-crm/server/data /var/backups/sdr-crm
 
 [Install]
 WantedBy=multi-user.target

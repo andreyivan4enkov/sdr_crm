@@ -14,4 +14,4 @@ CREATE INDEX IF NOT EXISTS "tasks_assignee_user_idx" ON "tasks" ("assignee_user_
 CREATE INDEX IF NOT EXISTS "tasks_status_idx" ON "tasks" ("status");
 CREATE INDEX IF NOT EXISTS "tasks_due_at_idx" ON "tasks" ("due_at");
 
-GRANT ALL ON TABLE "tasks" TO jbrealty;
+GRANT ALL ON TABLE "tasks" TO crm;

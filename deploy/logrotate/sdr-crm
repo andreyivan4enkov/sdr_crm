@@ -1,4 +1,4 @@
-/var/log/jbrealty/*.log {
+/var/log/sdr-crm/*.log {
     daily
     rotate 30
     compress
@@ -8,6 +8,6 @@
     create 0640 www-data www-data
     sharedscripts
     postrotate
-        systemctl reload jbrealty-api >/dev/null 2>&1 || true
+        systemctl reload sdr-crm-api >/dev/null 2>&1 || true
     endscript
 }

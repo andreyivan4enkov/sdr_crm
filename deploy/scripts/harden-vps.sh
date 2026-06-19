@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Базовое усиление Ubuntu VPS для JBrealty CRM
+# Базовое усиление Ubuntu VPS для SDR CRM
 set -euo pipefail
 
 if [[ $EUID -ne 0 ]]; then
@@ -16,7 +16,7 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
 
-cat > /etc/fail2ban/jail.d/jbrealty-sshd.conf <<'EOF'
+cat > /etc/fail2ban/jail.d/sdr-crm-sshd.conf <<'EOF'
 [sshd]
 enabled = true
 maxretry = 5

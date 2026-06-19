@@ -28,18 +28,46 @@ const INCREMENTAL_MIGRATIONS = [
   "0018_lead_assigned_user.sql",
   "0019_audit_entity_idx.sql",
   "0020_pipelines.sql",
+  "0021_lead_sdr_vectors.sql",
 ] as const;
 
 function splitSql(sql: string) {
-  return sql
-    .split(/;\s*\n/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith("--"));
+  const statements: string[] = [];
+  let buf = "";
+  let inDoBlock = false;
+
+  for (const line of sql.split("\n")) {
+    const trimmed = line.trim();
+    if (!inDoBlock && /^DO\s+\$\$/i.test(trimmed)) inDoBlock = true;
+
+    buf += `${line}\n`;
+
+    if (inDoBlock) {
+      if (/END\s+\$\$\s*;?\s*$/i.test(trimmed)) {
+        statements.push(buf.trim());
+        buf = "";
+        inDoBlock = false;
+      }
+      continue;
+    }
+
+    if (trimmed.endsWith(";") && !trimmed.startsWith("--")) {
+      const stmt = buf.trim();
+      if (stmt.length > 0 && !stmt.startsWith("--")) statements.push(stmt);
+      buf = "";
+    }
+  }
+
+  const tail = buf.trim();
+  if (tail.length > 0 && !tail.startsWith("--")) statements.push(tail);
+
+  return statements;
 }
 
 async function runSqlFile(path: string) {
   const statements = splitSql(readFileSync(path, "utf8"));
   for (const stmt of statements) {
+    if (isPglite && /^\s*GRANT\s/i.test(stmt)) continue;
     if (isPglite && pgliteClient) {
       await pgliteClient.exec(`${stmt};`);
     } else {

@@ -25,12 +25,12 @@ cd server && npm run db:migrate
 
 Файл: `server/drizzle/0008_marketer_role.sql` — роль marketer, записи интеграций, канал «Яндекс Метрика».
 
-На проде при ошибках прав: `GRANT ALL ON integrations TO jbrealty;` (и связанные таблицы при необходимости).
+На проде при ошибках прав: `GRANT ALL ON integrations TO crm;` (и связанные таблицы при необходимости).
 
 ## Деплой
 
 ```bash
 npm run build
 cd server && npm run build
-# скопировать dist/ и server/dist/, перезапустить jbrealty-api
+# скопировать dist/ и server/dist/, перезапустить sdr-crm-api
 ```

@@ -50,8 +50,15 @@ export function AdminAudit({ t }: { t: Record<string, string> }) {
           : <div className={`divide-y ${t.divide} max-h-[32rem] overflow-y-auto nice-scroll`}>
               {logs.map((l) => (
                 <div key={l.id} className="px-4 py-2.5 text-sm crm-data">
-                  <div className="flex justify-between gap-2">
-                    <span className="font-medium">{l.action}</span>
+                  <div className="flex justify-between gap-2 items-center">
+                    <span className="font-medium flex items-center gap-2">
+                      {l.action}
+                      {(l.meta as Record<string, unknown> | undefined)?.anomaly === true && (
+                        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                          anomaly
+                        </span>
+                      )}
+                    </span>
                     <span className={`text-xs ${t.muted}`}>{new Date(l.createdAt).toLocaleString("ru-RU")}</span>
                   </div>
                   <div className={`text-xs ${t.muted} mt-0.5`}>

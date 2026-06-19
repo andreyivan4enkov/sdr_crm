@@ -32,7 +32,7 @@ export function createApiClient(config: ApiClientConfig = {}) {
   return {
     health: () => request<{ ok: boolean; db: string; version: string; ts: number }>("/health"),
 
-    getAuthConfig: () => request<{ demoLogin: boolean; demoUsers?: { login: string; password: string; name: string }[] }>("/auth/config"),
+    getAuthConfig: () => request<{ demoLogin: boolean; publicUrl?: string; demoUsers?: { login: string; password: string; name: string }[] }>("/auth/config"),
 
     getPrivacy: () => request<{ operator: string; operatorEmail: string; updatedAt: string; sections: { title: string; text: string }[] }>("/public/privacy"),
 
@@ -74,6 +74,18 @@ export function createApiClient(config: ApiClientConfig = {}) {
     },
 
     logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
+
+    createQrLogin: (baseUrl?: string) =>
+      request<{ token: string; expiresAt: number; url: string }>("/auth/qr/create", {
+        method: "POST",
+        body: JSON.stringify(baseUrl ? { baseUrl } : {}),
+      }),
+
+    acceptQrLogin: (token: string) =>
+      request<{ user: AuthUser }>("/auth/qr/accept", {
+        method: "POST",
+        body: JSON.stringify({ token }),
+      }),
 
     me: () => request<{ user: AuthUser }>("/auth/me"),
 

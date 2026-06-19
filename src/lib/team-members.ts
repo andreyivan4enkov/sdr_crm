@@ -1,4 +1,4 @@
-import type { TeamMember } from "@jbrealty/api-client";
+import type { TeamMember } from "@sdr-crm/api-client";
 
 export function memberById(members: TeamMember[], id?: string | null) {
   if (!id) return undefined;

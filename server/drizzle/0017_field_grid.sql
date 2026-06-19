@@ -7,4 +7,4 @@ CREATE TABLE IF NOT EXISTS crm_meta (
   value jsonb NOT NULL DEFAULT '{}'
 );
 
-GRANT ALL ON TABLE crm_meta TO jbrealty;
+GRANT ALL ON TABLE crm_meta TO crm;

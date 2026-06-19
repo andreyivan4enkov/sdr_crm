@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "JBrealty CRM",
+  "name": "SDR CRM",
   "description": "Быстрые действия CRM: создать лид, открыть карточку с сайта объявления",
   "version": "0.1.0",
   "action": {
-    "default_title": "JBrealty CRM",
+    "default_title": "SDR CRM",
     "default_popup": "popup/popup.html"
   },
   "background": {

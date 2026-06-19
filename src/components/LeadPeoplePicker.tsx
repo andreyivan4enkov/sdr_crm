@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Plus, Search } from "lucide-react";
-import type { TeamMember } from "@jbrealty/api-client";
+import type { TeamMember } from "@sdr-crm/api-client";
 import { EmployeeAvatar, EmployeeChip } from "./EmployeeChip";
 
 export function BioGlassAddButton({

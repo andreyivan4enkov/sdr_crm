@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#d6d2ca;padding:24px;font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+@keyframes wv{0%,100%{transform:scaleY(0.25)}50%{transform:scaleY(1)}}
+@keyframes mpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes burst{0%{transform:translate(-50%,-50%) scale(0.2);opacity:0}35%{opacity:0.85}100%{transform:translate(-50%,-50%) scale(2.6);opacity:0}}
+@keyframes ripple{0%{transform:translate(-50%,-50%) scale(0.4);opacity:0.55}100%{transform:translate(-50%,-50%) scale(2.4);opacity:0}}
+@keyframes slideUp{from{transform:translateY(80px)}to{transform:translateY(0)}}
+@keyframes pop{0%{transform:scale(0.55)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes flash{from{opacity:0.85}to{opacity:0}}
+</style>
+</helmet>
+<div style="display:flex;align-items:center;justify-content:center;">
+  <x-import component="IOSDevice" from="./ios-frame.jsx" dark="{{ frameDark }}" hint-size="402px,874px">
+    <div ref="{{ setScreenRef }}" style="{{ screenStyle }}">
+
+      <!-- ============ INFO ZONE ============ -->
+      <div style="{{ infoStyle }}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <span style="{{ flowLabelStyle }}">ПОТОК</span>
+          <span style="{{ queueCountStyle }}">{{ queueCount }} в очереди</span>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:22px;">
+          <sc-for list="{{ legend }}" as="g" hint-placeholder-count="4">
+            <div style="{{ g.wrapStyle }}">
+              <div style="display:flex;align-items:center;justify-content:center;height:30px;">{{ g.glyph }}</div>
+              <span style="{{ g.labelStyle }}">{{ g.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="{{ badgeStyle }}">
+          <span style="{{ badgeDotStyle }}"></span>{{ statusLabel }}
+        </div>
+        <div style="{{ titleStyle }}">{{ title }}</div>
+        <div style="{{ companyStyle }}">{{ company }}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:14px;">
+          <span style="{{ line1Style }}">{{ line1 }}</span>
+        </div>
+        <div style="{{ line2Style }}">{{ line2 }}</div>
+        <sc-if value="{{ showPriority }}" hint-placeholder-val="{{ true }}">
+          <div style="{{ engineStyle }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+              <span style="{{ engineLabelStyle }}">ДВИЖОК ОЧЕРЕДИ</span>
+              <span style="{{ engineScoreStyle }}">P {{ priority }}</span>
+            </div>
+            <div style="{{ meterTrackStyle }}"><div style="{{ meterFillStyle }}"></div></div>
+            <div style="{{ reasonStyle }}">{{ reason }}</div>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- ============ CONTEXT LINE ============ -->
+      <div style="{{ ctxWrapStyle }}">
+        <div style="{{ dividerStyle }}"></div>
+        <div style="{{ ctxTextStyle }}">{{ ctxText }}</div>
+        <div style="{{ ctxSubStyle }}">{{ ctxSub }}</div>
+      </div>
+
+      <!-- ============ MOTOR ZONE (dial) ============ -->
+      <svg viewBox="0 0 402 874" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible;">
+        <path d="{{ grooveD }}" fill="none" stroke="{{ track }}" stroke-width="36" stroke-linecap="round"></path>
+        <path d="{{ grooveD }}" fill="none" stroke="{{ grooveShade }}" stroke-width="2" stroke-linecap="round" opacity="0.5"></path>
+        <sc-for list="{{ sectorsView }}" as="s" hint-placeholder-count="4">
+          <path d="{{ s.stripD }}" fill="none" stroke="{{ s.color }}" stroke-width="7" stroke-linecap="round" opacity="{{ s.stripOpacity }}"></path>
+        </sc-for>
+        <rect x="199" y="{{ homeY }}" width="3" height="13" rx="1.5" fill="{{ track2 }}"></rect>
+      </svg>
+
+      <sc-for list="{{ sectorsView }}" as="s" hint-placeholder-count="4">
+        <div style="{{ s.dotStyle }}">{{ s.icon }}</div>
+      </sc-for>
+
+      <!-- archive well -->
+      <div style="{{ wellStyle }}">
+        <div style="{{ wellRippleStyle }}"></div>
+        {{ wellIcon }}
+      </div>
+
+      <!-- active figure on 12:00 -->
+      <div style="{{ figureStyle }}" onPointerDown="{{ onFigureDown }}">{{ figureEl }}</div>
+
+      <!-- ============ TEXT INPUT OVERLAY ============ -->
+      <sc-if value="{{ overlayOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ overlayBackdropStyle }}">
+          <div style="{{ panelStyle }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <div>
+                <div style="{{ panelKickerStyle }}">{{ overlayKicker }}</div>
+                <div style="{{ panelTitleStyle }}">{{ overlayLabel }}</div>
+              </div>
+              <div style="{{ closeBtnStyle }}" onClick="{{ onCancel }}">{{ closeIcon }}</div>
+            </div>
+            <div style="{{ panelObjStyle }}">{{ title }}</div>
+
+            <div style="{{ inputAreaStyle }}">
+              <sc-if value="{{ recording }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:flex-end;gap:5px;height:48px;">
+                  <sc-for list="{{ waveBars }}" as="b" hint-placeholder-count="11">
+                    <div style="{{ b.style }}"></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ showText }}" hint-placeholder-val="{{ false }}">
+                <div style="{{ transcriptStyle }}">{{ overlayText }}</div>
+              </sc-if>
+              <sc-if value="{{ showPrompt }}" hint-placeholder-val="{{ false }}">
+                <div style="{{ promptStyle }}">{{ promptText }}</div>
+              </sc-if>
+            </div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px;">
+              <sc-for list="{{ chips }}" as="ch" hint-placeholder-count="4">
+                <div style="{{ ch.style }}" onClick="{{ ch.onClick }}">{{ ch.label }}</div>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:14px;margin-top:18px;">
+              <sc-if value="{{ showMic }}" hint-placeholder-val="{{ true }}">
+                <div style="{{ micBtnStyle }}" onClick="{{ onMic }}">{{ micIcon }}</div>
+              </sc-if>
+              <div style="{{ sendBtnStyle }}" onClick="{{ onSend }}">{{ sendLabel }}</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ INTERACTION SURFACE ============ -->
+      <sc-if value="{{ interactionOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ interStyle }}">
+          <sc-if value="{{ flashOn }}" hint-placeholder-val="{{ false }}"><div style="{{ flashStyle }}"></div></sc-if>
+
+          <sc-if value="{{ isCall }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ callTopStyle }}">ИСХОДЯЩИЙ ВЫЗОВ</div>
+            <div style="{{ avatarStyle }}">{{ callInitials }}</div>
+            <div style="{{ callNameStyle }}">{{ callName }}</div>
+            <div style="{{ callNumStyle }}">{{ callNumber }}</div>
+            <div style="{{ callStatusStyle }}">{{ callStatus }}</div>
+            <div style="{{ callCtrlRowStyle }}">
+              <div style="{{ callCtrlStyle }}">{{ micCtrlIcon }}</div>
+              <div style="{{ callCtrlStyle }}">{{ padCtrlIcon }}</div>
+              <div style="{{ callCtrlStyle }}">{{ spkCtrlIcon }}</div>
+            </div>
+            <div style="{{ endCallStyle }}" onClick="{{ onCloseInteraction }}">{{ endCallIcon }}</div>
+          </sc-if>
+
+          <sc-if value="{{ isView }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ viewBarStyle }}">
+              <div style="{{ viewCloseStyle }}" onClick="{{ onCloseInteraction }}">{{ backIcon }}</div>
+              <div style="{{ viewBarTitleStyle }}">{{ overlayLabel2 }}</div>
+              <div style="{{ viewEditStyle }}">{{ editIcon }}</div>
+            </div>
+            <div style="{{ viewScrollStyle }}">
+              <div style="{{ paperStyle }}">
+                <div style="{{ paperTitleStyle }}">{{ title }}</div>
+                <div style="{{ paperCompanyStyle }}">{{ company }}</div>
+                <div style="{{ paperFieldsStyle }}">
+                  <sc-for list="{{ viewFields }}" as="f" hint-placeholder-count="4">
+                    <div style="{{ f.rowStyle }}"><span style="{{ f.kStyle }}">{{ f.k }}</span><span style="{{ f.vStyle }}">{{ f.v }}</span></div>
+                  </sc-for>
+                </div>
+                <sc-for list="{{ viewBody }}" as="ln" hint-placeholder-count="2">
+                  <div style="{{ ln.style }}">{{ ln.t }}</div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="{{ viewDoneStyle }}" onClick="{{ onCloseInteraction }}">Готово</div>
+          </sc-if>
+
+          <sc-if value="{{ isChecklist }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ viewBarStyle }}">
+              <div style="{{ viewCloseStyle }}" onClick="{{ onCloseInteraction }}">{{ backIcon }}</div>
+              <div style="{{ viewBarTitleStyle }}">{{ overlayLabel2 }}</div>
+              <div style="{{ checkProgStyle }}">{{ checkProgress }}</div>
+            </div>
+            <div style="{{ viewScrollStyle }}">
+              <sc-for list="{{ checkItems }}" as="ci" hint-placeholder-count="5">
+                <div style="{{ ci.rowStyle }}" onClick="{{ ci.onClick }}">
+                  <div style="{{ ci.boxStyle }}">{{ ci.check }}</div>
+                  <span style="{{ ci.labelStyle }}">{{ ci.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="{{ viewDoneStyle }}" onClick="{{ onCloseInteraction }}">Готово</div>
+          </sc-if>
+
+          <sc-if value="{{ isCamera }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ camTopStyle }}">{{ camTitle }}</div>
+            <div style="{{ camFrameStyle }}">
+              <div style="{{ camBracketTL }}"></div>
+              <div style="{{ camBracketTR }}"></div>
+              <div style="{{ camBracketBL }}"></div>
+              <div style="{{ camBracketBR }}"></div>
+              <div style="{{ camHintStyle }}">{{ camHint }}</div>
+            </div>
+            <div style="{{ camBottomStyle }}">
+              <div style="{{ camCountStyle }}">{{ shotLabel }}</div>
+              <div style="{{ shutterStyle }}" onClick="{{ onShutter }}"><div style="{{ shutterInnerStyle }}"></div></div>
+              <div style="{{ camDoneStyle }}" onClick="{{ onCloseInteraction }}">{{ camDoneLabel }}</div>
+            </div>
+            <div style="{{ camCloseStyle }}" onClick="{{ onCloseInteraction }}">{{ closeIconW }}</div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ============ INBOX ZERO ============ -->
+      <sc-if value="{{ inbox }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ inboxStyle }}">
+          <div style="{{ burstStyle }}"></div>
+          <div style="{{ inboxIconWrapStyle }}">{{ inboxCheck }}</div>
+          <div style="{{ inboxTitleStyle }}">Поток пуст</div>
+          <div style="{{ inboxSubStyle }}">Дневной план выполнен. Вы обработали {{ doneCount }} {{ doneWord }}.</div>
+          <div style="display:flex;gap:9px;flex-wrap:wrap;justify-content:center;max-width:300px;margin:26px 0 30px;">
+            <sc-for list="{{ doneView }}" as="d" hint-placeholder-count="6">
+              <div style="{{ d.wrapStyle }}">{{ d.glyph }}</div>
+            </sc-for>
+          </div>
+          <div style="{{ resetBtnStyle }}" onClick="{{ onReset }}">Начать заново</div>
+        </div>
+      </sc-if>
+
+    </div>
+  </x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 520, &quot;height&quot;: 980 },
+  &quot;theme&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;Светлая&quot;, &quot;Тёмная&quot;], &quot;default&quot;: &quot;Светлая&quot;, &quot;tsType&quot;: &quot;string&quot; },
+  &quot;sound&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; },
+  &quot;showPriority&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot; }
+}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.G = { CX:201, PY:772, R:170, FAN:76, NEUT:14, ARCH:106, RMIN:50, FIG:92 };
+    this.C = { RED:'#D8513B', AMBER:'#E0A53F', GREEN:'#4FA877', SLATE:'#8893A6',
+               BLUE:'#5B86C9' };
+    this.state = {
+      queue: this.initQ(), doneStack: [],
+      dragging:false, angle:0, radius:this.G.R, activeSector:null,
+      committing:null, overlay:null, overlayText:'', recording:false,
+      inbox:false, dropPhase:'in',
+      interaction:null, callSecs:0, shots:0, checks:[], flash:false
+    };
+    this.setScreenRef = (el)=>{ this.screenRef = el; };
+    this.onFigureDown = this.onFigureDown.bind(this);
+    this.onMove = this.onMove.bind(this);
+    this.onUp = this.onUp.bind(this);
+    this.onMic = this.onMic.bind(this);
+    this.onSend = this.onSend.bind(this);
+    this.onCancel = this.onCancel.bind(this);
+    this.onReset = this.onReset.bind(this);
+    this.onCloseInteraction = this.closeInteraction.bind(this);
+    this.onShutter = this.onShutter.bind(this);
+  }
+
+  initQ(){
+    const BLUE='#5B86C9', AMBER='#E0A53F', RED='#D8513B';
+    return [
+      { type:'lead', title:'Звонок: Артём Соколов', company:'Заявка с сайта · тариф «Бизнес»',
+        line1:'+7 916 240-18-77', line2:'Поступила 4 минуты назад',
+        statusLabel:'Новый', statusColor:BLUE, priority:96,
+        reason:'Новый лид — мгновенный приоритет над администрированием',
+        interact:{label:'Позвонить',kind:'call'},
+        var1:{label:'Написать',input:'dictation'}, var2:{label:'Отложить',input:'none'},
+        target:{label:'Перезвонить',input:'dictation'} },
+      { type:'doc', title:'Акт сверки № 1184', company:'ООО «Север-Логистик»',
+        line1:'Сумма ₽ 1 240 000', line2:'Срок истёк вчера в 18:00',
+        statusLabel:'Просрочено', statusColor:RED, priority:94,
+        reason:'Просрочено — вытолкнут в начало очереди',
+        interact:{label:'Открыть документ',kind:'view'},
+        var1:{label:'На доработку',input:'comment'}, var2:{label:'Отложить',input:'none'},
+        target:{label:'Подписать',input:'none'} },
+      { type:'deal', title:'Поставка оборудования', company:'АО «Уралтех»',
+        line1:'₽ 3 800 000 · вероятность 70%', line2:'След. шаг: согласование сметы',
+        statusLabel:'В работе', statusColor:AMBER, priority:81,
+        reason:'В работе — дедлайн этапа сегодня',
+        interact:{label:'Открыть сделку',kind:'view'},
+        var1:{label:'Передать',input:'none'}, var2:{label:'Отложить',input:'none'},
+        target:{label:'На согласование',input:'comment'} },
+      { type:'task', title:'Приёмка товара на складе', company:'Поставка от АО «Уралтех»',
+        line1:'12 позиций · ожидается', line2:'Окно приёмки: до 17:00',
+        statusLabel:'В работе', statusColor:AMBER, priority:68,
+        reason:'Привязана к активной поставке оборудования',
+        interact:{label:'Сфотографировать приёмку',kind:'camera'},
+        var1:{label:'Делегировать',input:'none'}, var2:{label:'Отложить',input:'none'},
+        target:{label:'Завершить приёмку',input:'none'} },
+      { type:'deal', title:'Внедрение CRM', company:'ИП Кузнецова Е. А.',
+        line1:'₽ 540 000 · новая сделка', line2:'Источник: рекомендация',
+        statusLabel:'Новая', statusColor:BLUE, priority:55,
+        reason:'Новая сделка в воронке квалификации',
+        interact:{label:'Открыть сделку',kind:'view'},
+        var1:{label:'Передать',input:'none'}, var2:{label:'Отложить',input:'none'},
+        target:{label:'На согласование',input:'comment'} },
+      { type:'task', title:'Подготовить КП', company:'Сделка «Внедрение CRM»',
+        line1:'Чек-лист: 3 из 5', line2:'Срок: сегодня в 16:00',
+        statusLabel:'В работе', statusColor:AMBER, priority:47,
+        reason:'Плановая подготовка коммерческого предложения',
+        interact:{label:'Открыть чек-лист',kind:'checklist',items:['Бриф от клиента','Расчёт стоимости','Описание этапов работ','Оформление обложки','Финальная вычитка']},
+        var1:{label:'Делегировать',input:'none'}, var2:{label:'Отложить',input:'none'},
+        target:{label:'Завершить',input:'none'} }
+    ];
+  }
+
+  componentDidMount(){
+    window.addEventListener('pointermove', this.onMove, {passive:false});
+    window.addEventListener('pointerup', this.onUp);
+  }
+  componentWillUnmount(){
+    window.removeEventListener('pointermove', this.onMove);
+    window.removeEventListener('pointerup', this.onUp);
+    clearInterval(this._callT);
+  }
+
+  openSnd(){
+    if(!this.sndOn()||!this.ac) return;
+    const t=this.ac.currentTime, o=this.ac.createOscillator(), g=this.ac.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(300,t); o.frequency.exponentialRampToValueAtTime(560,t+0.12);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.12,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.2);
+    o.connect(g); g.connect(this.ac.destination); o.start(t); o.stop(t+0.22);
+  }
+  shutterSnd(){
+    if(!this.sndOn()||!this.ac) return;
+    const t=this.ac.currentTime, o=this.ac.createOscillator(), g=this.ac.createGain(), f=this.ac.createBiquadFilter();
+    f.type='bandpass'; f.frequency.value=2400; f.Q.value=3;
+    o.type='square'; o.frequency.setValueAtTime(1400,t);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.1,t+0.003); g.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
+    o.connect(f); f.connect(g); g.connect(this.ac.destination); o.start(t); o.stop(t+0.06);
+  }
+  openInteraction(kind,label){
+    const st={ interaction:{kind,label}, angle:0, radius:this.G.R, activeSector:null };
+    if(kind==='camera') st.shots=0;
+    if(kind==='call') st.callSecs=0;
+    if(kind==='checklist'){ const items=((this.state.queue[0]||{}).interact||{}).items||[]; st.checks=items.map((_,i)=>i<3); }
+    this.openSnd();
+    this.setState(st);
+    if(kind==='call'){ clearInterval(this._callT); this._callT=setInterval(()=>this.setState(s=>({callSecs:s.callSecs+1})),1000); }
+  }
+  closeInteraction(){ clearInterval(this._callT); this.setState({interaction:null, flash:false}); }
+  onShutter(){ this.shutterSnd(); this.setState(s=>({shots:s.shots+1, flash:true})); clearTimeout(this._flashT); this._flashT=setTimeout(()=>this.setState({flash:false}),190); }
+  toggleCheck(i){ this.setState(s=>{ const ch=s.checks.slice(); ch[i]=!ch[i]; return {checks:ch}; }); }
+  interactIcon(kind,color){
+    const R=React.createElement;
+    if(kind==='call') return this.svgIcon([R('path',{key:1,d:'M6.5 4h3l1.5 4-2 1.5a12 12 0 005.5 5.5L16 17l4 1.5V21a1.5 1.5 0 01-1.6 1.5A16.5 16.5 0 013.5 5.6 1.5 1.5 0 015 4z'})],color,20);
+    if(kind==='camera') return this.svgIcon([R('path',{key:1,d:'M4 8.5h3L8.5 6h7L17 8.5h3v11H4z'}),R('circle',{key:2,cx:12,cy:13.5,r:3.1})],color,20);
+    if(kind==='checklist') return this.svgIcon([R('path',{key:1,d:'M10 6h10M10 12h10M10 18h10M4 6l1.4 1.4L8 4.6M4 12l1.4 1.4L8 10.6M4 18l1.4 1.4L8 16.6'})],color,20);
+    return this.svgIcon([R('path',{key:1,d:'M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z'}),R('circle',{key:2,cx:12,cy:12,r:3})],color,20);
+  }
+
+  /* ---------- audio ---------- */
+  sndOn(){ return this.props.sound !== false; }
+  ensureAudio(){
+    if(!this.ac){ try{ this.ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+    if(this.ac && this.ac.state==='suspended') this.ac.resume();
+  }
+  tick(){
+    if(!this.sndOn()||!this.ac) return;
+    const t=this.ac.currentTime, o=this.ac.createOscillator(), g=this.ac.createGain(), f=this.ac.createBiquadFilter();
+    f.type='bandpass'; f.frequency.value=1600; f.Q.value=2.2;
+    o.type='triangle'; o.frequency.setValueAtTime(880,t);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.11,t+0.004); g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);
+    o.connect(f); f.connect(g); g.connect(this.ac.destination); o.start(t); o.stop(t+0.09);
+  }
+  bass(){
+    if(!this.sndOn()||!this.ac) return;
+    const t=this.ac.currentTime, o=this.ac.createOscillator(), g=this.ac.createGain(), f=this.ac.createBiquadFilter();
+    f.type='lowpass'; f.frequency.setValueAtTime(900,t); f.frequency.exponentialRampToValueAtTime(120,t+0.4);
+    o.type='sine'; o.frequency.setValueAtTime(240,t); o.frequency.exponentialRampToValueAtTime(58,t+0.42);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.3,t+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+0.45);
+    o.connect(f); f.connect(g); g.connect(this.ac.destination); o.start(t); o.stop(t+0.5);
+  }
+  thunk(){
+    if(!this.sndOn()||!this.ac) return;
+    const t=this.ac.currentTime, o=this.ac.createOscillator(), g=this.ac.createGain(), f=this.ac.createBiquadFilter();
+    f.type='lowpass'; f.frequency.value=200;
+    o.type='sine'; o.frequency.setValueAtTime(130,t); o.frequency.exponentialRampToValueAtTime(70,t+0.18);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.26,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.26);
+    o.connect(f); f.connect(g); g.connect(this.ac.destination); o.start(t); o.stop(t+0.3);
+  }
+  sizzle(){
+    if(!this.sndOn()||!this.ac) return;
+    const t=this.ac.currentTime, dur=0.5, n=this.ac.sampleRate*dur;
+    const buf=this.ac.createBuffer(1,n,this.ac.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<n;i++){ d[i]=(Math.random()*2-1)*(1-i/n); }
+    const src=this.ac.createBufferSource(); src.buffer=buf;
+    const f=this.ac.createBiquadFilter(); f.type='bandpass'; f.Q.value=1.1;
+    f.frequency.setValueAtTime(3200,t); f.frequency.exponentialRampToValueAtTime(500,t+dur);
+    const g=this.ac.createGain(); g.gain.setValueAtTime(0.16,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    src.connect(f); f.connect(g); g.connect(this.ac.destination); src.start(t);
+  }
+  chord(){
+    if(!this.sndOn()||!this.ac) return;
+    const t=this.ac.currentTime, notes=[523.25,659.25,783.99,1046.5];
+    notes.forEach((fr,i)=>{
+      const o=this.ac.createOscillator(), g=this.ac.createGain();
+      o.type='sine'; o.frequency.value=fr;
+      const s=t+i*0.09;
+      g.gain.setValueAtTime(0.0001,s); g.gain.exponentialRampToValueAtTime(0.17,s+0.03); g.gain.exponentialRampToValueAtTime(0.0001,s+1.1);
+      o.connect(g); g.connect(this.ac.destination); o.start(s); o.stop(s+1.2);
+    });
+  }
+
+  /* ---------- color + shapes ---------- */
+  shade(hex,p){
+    hex=hex.replace('#',''); let r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16);
+    const f=(c)=>{ const tgt=p<0?0:255, a=Math.abs(p); return Math.round((tgt-c)*a)+c; };
+    return '#'+[f(r),f(g),f(b)].map(x=>Math.max(0,Math.min(255,x)).toString(16).padStart(2,'0')).join('');
+  }
+  shapeGlyph(type, px, color, dark){
+    const R=React.createElement;
+    const L=this.shade(color,0.46), M=color, D=this.shade(color,-0.26), DD=this.shade(color,-0.46);
+    const ds = dark ? 'rgba(0,0,0,0.55)' : 'rgba(110,100,82,0.4)';
+    const filter=`drop-shadow(3px 5px 6px ${ds})`;
+    if(type==='deal'){
+      return R('div',{style:{width:px,height:px,borderRadius:'50%',
+        background:`radial-gradient(circle at 33% 27%, ${this.shade(color,0.6)}, ${M} 50%, ${D} 88%)`,
+        boxShadow:`inset -4px -5px 11px ${DD}, inset 3px 3px 9px ${this.shade(color,0.55)}, 3px 5px 8px ${ds}`}});
+    }
+    const svg=(ch,extra)=>R('svg',Object.assign({width:px,height:px,viewBox:'0 0 100 100',style:Object.assign({filter,overflow:'visible'},extra||{})},{}),ch);
+    const poly=(pts,fill,k)=>R('polygon',{points:pts,fill,key:k});
+    if(type==='task'){
+      return svg([
+        poly('50,10 86,30 50,50 14,30', L,'t'),
+        poly('14,30 50,50 50,92 14,72', D,'l'),
+        poly('86,30 50,50 50,92 86,72', M,'r'),
+        R('polygon',{key:'o',points:'50,10 86,30 86,72 50,92 14,72 14,30',fill:'none',stroke:DD,strokeWidth:1,strokeOpacity:0.35,strokeLinejoin:'round'})
+      ]);
+    }
+    if(type==='lead'){
+      return svg([
+        R('ellipse',{key:'sh',cx:50,cy:90,rx:33,ry:5,fill:DD,opacity:0.22}),
+        poly('50,8 16,86 50,80', M,'l'),
+        poly('50,8 84,86 50,80', D,'r'),
+        R('line',{key:'e',x1:50,y1:8,x2:50,y2:80,stroke:this.shade(color,0.2),strokeWidth:1,strokeOpacity:0.4})
+      ]);
+    }
+    return svg([
+      R('rect',{key:'p',x:24,y:12,width:52,height:78,rx:5,fill:L}),
+      poly('63,12 76,12 76,25', this.shade(color,0.08),'fold'),
+      R('rect',{key:'l1',x:32,y:32,width:30,height:4,rx:2,fill:M,opacity:0.55}),
+      R('rect',{key:'l2',x:32,y:44,width:36,height:4,rx:2,fill:M,opacity:0.55}),
+      R('rect',{key:'l3',x:32,y:56,width:24,height:4,rx:2,fill:M,opacity:0.55}),
+      R('rect',{key:'l4',x:32,y:68,width:34,height:4,rx:2,fill:M,opacity:0.38})
+    ], {transform:'rotate(-5deg)'});
+  }
+  svgIcon(children, color, size){
+    return React.createElement('svg',{width:size||18,height:size||18,viewBox:'0 0 24 24',fill:'none',
+      stroke:color,strokeWidth:2.3,strokeLinecap:'round',strokeLinejoin:'round'},children);
+  }
+  roleIcon(role,color){
+    const R=React.createElement;
+    if(role==='delete') return this.svgIcon([R('path',{key:1,d:'M6 6l12 12M18 6L6 18'})],color);
+    if(role==='go') return this.svgIcon([R('path',{key:1,d:'M4.5 12.5l5 5 10-11'})],color);
+    if(role==='archive') return this.svgIcon([R('path',{key:1,d:'M12 3v10m0 0l-4-4m4 4l4-4M5 16v3h14v-3'})],color);
+    return this.svgIcon([R('circle',{key:1,cx:12,cy:12,r:8.5}),R('path',{key:2,d:'M12 8v4.3l2.8 1.7'})],color);
+  }
+
+  /* ---------- geometry ---------- */
+  pt(deg,r){ const t=deg*Math.PI/180; return [this.G.CX+r*Math.sin(t), this.G.PY-r*Math.cos(t)]; }
+  arc(a1,a2,r){ const [x1,y1]=this.pt(a1,r),[x2,y2]=this.pt(a2,r);
+    return `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`; }
+
+  detect(ang,rad){
+    const {FAN,NEUT,ARCH}=this.G;
+    if(rad<ARCH) return 'interact';
+    if(Math.abs(ang)<NEUT) return null;
+    if(ang<=-42) return 'delete';
+    if(ang<-NEUT) return 'var1';
+    if(ang>=42) return 'target';
+    if(ang>NEUT) return 'var2';
+    return null;
+  }
+  meta(key){
+    const c=this.state.queue[0]||{var1:{},var2:{},target:{}};
+    const {RED,AMBER,GREEN,SLATE}=this.C;
+    if(key==='delete') return {label:'Удалить',color:RED,input:'reason',role:'delete'};
+    if(key==='interact'){ const it=c.interact||{}; return {label:it.label||'Открыть',color:'#4E8C86',input:'none',role:'interact'}; }
+    if(key==='var1') return {label:c.var1.label,color:AMBER,input:c.var1.input,role:'caution'};
+    if(key==='var2') return {label:c.var2.label,color:AMBER,input:c.var2.input,role:'caution'};
+    if(key==='target') return {label:c.target.label,color:GREEN,input:c.target.input,role:'go'};
+    return {label:'',color:'#888',input:'none',role:''};
+  }
+
+  /* ---------- interaction ---------- */
+  onFigureDown(e){
+    if(this.state.committing||this.state.overlay||this.state.inbox||this.state.interaction) return;
+    e.preventDefault(); this.ensureAudio();
+    const el=this.screenRef; this.rect = el? el.getBoundingClientRect() : null;
+    this.scale = this.rect ? this.rect.width/402 : 1;
+    this._drag = true; this._active = null;
+    this.setState({dragging:true, dropPhase:'in'});
+    this.onMove(e);
+  }
+  onMove(e){
+    if(!this._drag||!this.rect) return;
+    e.preventDefault();
+    const {CX,PY,FAN,R,RMIN}=this.G;
+    const x=(e.clientX-this.rect.left)/this.scale, y=(e.clientY-this.rect.top)/this.scale;
+    let dx=x-CX, dy=y-PY;
+    let rad=Math.hypot(dx,dy);
+    let ang=Math.atan2(dx,-dy)*180/Math.PI;
+    ang=Math.max(-FAN,Math.min(FAN,ang));
+    rad=Math.max(RMIN,Math.min(R+44,rad));
+    const key=this.detect(ang,rad);
+    if(key!==this._active) this.tick();
+    this._active = key;
+    this.setState({angle:ang, radius:rad, activeSector:key});
+  }
+  onUp(){
+    if(!this._drag) return;
+    this._drag = false;
+    const key=this._active;
+    this.setState({dragging:false});
+    if(key) this.beginAction(key);
+    else this.setState({angle:0, radius:this.G.R, activeSector:null});
+  }
+
+  beginAction(key){
+    const m=this.meta(key);
+    if(key==='interact'){ const it=(this.state.queue[0]||{}).interact||{}; this.openInteraction(it.kind, m.label); return; }
+    if(m.input!=='none'){
+      this.setState({ overlay:{kind:m.input,label:m.label,color:m.color,sector:key},
+        overlayText:'', recording:false, angle:0, radius:this.G.R });
+    } else {
+      this.runCommit(key,m);
+    }
+  }
+  runCommit(key,m){
+    this.setState({angle:0, radius:this.G.R, activeSector:null});
+    if(key==='archive'){ this.thunk();
+      this.setState({committing:{type:'archive',color:m.color}});
+      setTimeout(()=>this.advance(),460);
+    } else { this.bass();
+      this.setState({committing:{type:'collapse',color:m.color}});
+      setTimeout(()=>this.advance(),480);
+    }
+  }
+  onMic(){
+    if(this.state.recording) return;
+    this.ensureAudio();
+    this.setState({recording:true});
+    const o=this.state.overlay; const k=o?o.sector:'';
+    const txt = (o&&o.kind==='dictation')
+      ? (k==='target' ? 'Дозвонился. Клиенту интересен тариф «Бизнес», договорились созвониться завтра в 11:00 и выслать КП.'
+                      : 'Отправил клиенту презентацию и ссылку на тарифы, жду реакции.')
+      : 'Не хватает приложения № 2 и подписи на стр. 3 — возвращаю на доработку.';
+    setTimeout(()=>{ if(this.state.recording) this.setState({recording:false, overlayText:txt}); }, 1300);
+  }
+  onSend(){
+    const o=this.state.overlay; if(!o) return;
+    if(o.kind==='reason' && !this.state.overlayText.trim()) return;
+    this.sizzle();
+    this.setState({overlay:null, recording:false, committing:{type:'burn',color:o.color}});
+    setTimeout(()=>this.advance(),520);
+  }
+  onCancel(){
+    this.setState({overlay:null, recording:false, overlayText:'', angle:0, radius:this.G.R, activeSector:null});
+  }
+  advance(){
+    const q=this.state.queue.slice();
+    const cur=q.shift();
+    const done=cur ? this.state.doneStack.concat([{type:cur.type,color:cur.statusColor}]) : this.state.doneStack;
+    if(q.length===0){ this.chord();
+      this.setState({queue:q, doneStack:done, committing:null, inbox:true, activeSector:null});
+      return;
+    }
+    this.setState({queue:q, doneStack:done, committing:null, activeSector:null,
+      angle:0, radius:this.G.R, dropPhase:'pre'});
+    requestAnimationFrame(()=>requestAnimationFrame(()=>this.setState({dropPhase:'in'})));
+  }
+  onReset(){
+    this.setState({queue:this.initQ(), doneStack:[], inbox:false, committing:null,
+      overlay:null, activeSector:null, angle:0, radius:this.G.R, dropPhase:'pre'});
+    requestAnimationFrame(()=>requestAnimationFrame(()=>this.setState({dropPhase:'in'})));
+  }
+
+  computeFigure(dark){
+    const {CX,PY,R,FIG}=this.G, s=this.state;
+    let ang= s.dragging? s.angle:0, rad= s.dragging? s.radius:R;
+    const t=ang*Math.PI/180;
+    let left=CX+rad*Math.sin(t), top=PY-rad*Math.cos(t);
+    let tf='translate(-50%,-50%)', op=1, fil='';
+    let trans = s.dragging ? 'none' : 'left .45s cubic-bezier(.34,1.3,.5,1), top .45s cubic-bezier(.34,1.3,.5,1), transform .45s, filter .2s';
+    const glow=(s.dragging && s.activeSector)? this.meta(s.activeSector).color : null;
+    if(glow) fil=`drop-shadow(0 0 16px ${glow})`;
+    const c=s.committing;
+    if(c){
+      if(c.type==='collapse'){ tf='translate(-50%,-50%) perspective(420px) rotateX(85deg) scale(0.08)'; op=0; fil='blur(2px)'; trans='all .46s ease-in'; }
+      else if(c.type==='burn'){ tf='translate(-50%,-50%) scale(1.42)'; op=0; fil='blur(7px) brightness(1.7) saturate(1.5)'; trans='all .5s ease-out'; }
+      else { left=CX; top=PY; tf='translate(-50%,-50%) scale(0.16)'; op=0.2; fil='blur(1px)'; trans='all .42s cubic-bezier(.5,0,.85,.3)'; }
+    } else if(s.dropPhase==='pre'){ top=top-200; op=0; trans='none'; }
+    else if(s.dropPhase==='in' && !s.dragging){ trans='top .6s cubic-bezier(.34,1.56,.64,1), opacity .35s, left .4s, transform .4s, filter .2s'; }
+    return { position:'absolute', left:left+'px', top:top+'px', width:FIG, height:FIG,
+      transform:tf, transition:trans, opacity:op, filter:fil,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      cursor: s.dragging?'grabbing':'grab', touchAction:'none', zIndex:4 };
+  }
+
+  renderVals(){
+    const s=this.state, G=this.G, {RED,AMBER,GREEN,SLATE}=this.C;
+    const dark = (this.props.theme||'Светлая')==='Тёмная';
+    const showPriority = this.props.showPriority !== false;
+
+    const T = dark
+      ? { bg:'#25272C', sL:'#33363D', sD:'#1A1B1F', text:'#ECEAE5', dim:'#8E919A', faint:'#5C606A',
+          track:'#2C2E34', track2:'#43464E', gShade:'#17181C', glyphOff:'#5A5E68', card:'#2B2D33' }
+      : { bg:'#E9E5DF', sL:'#FFFFFF', sD:'#C8C2B7', text:'#36322B', dim:'#8C857A', faint:'#B7AFA3',
+          track:'#DCD7CE', track2:'#C2BCB1', gShade:'#BDB6AA', glyphOff:'#C0B9AC', card:'#ECE8E2' };
+
+    const raised=(d,bl)=>`${d}px ${d}px ${bl}px ${T.sD}, -${d}px -${d}px ${bl}px ${T.sL}`;
+    const inset=(d,bl)=>`inset ${d}px ${d}px ${bl}px ${T.sD}, inset -${d}px -${d}px ${bl}px ${T.sL}`;
+
+    const c = s.queue[0] || {type:'deal',title:'',company:'',line1:'',line2:'',statusLabel:'',statusColor:'#888',reason:'',priority:0,var1:{label:'',input:'none'},var2:{label:'',input:'none'},target:{label:'',input:'none'},interact:{label:'Открыть',kind:'view'}};
+    const INTERACT='#4E8C86';
+    const interactShort=({call:'позвонить',view:'открыть',camera:'снять фото',checklist:'чек-лист'})[(c.interact||{}).kind]||'открыть';
+
+    /* legend */
+    const types=[['deal','Сделка'],['task','Задача'],['lead','Лид'],['doc','Документ']];
+    const legend=types.map(([ty,lb])=>{
+      const active = ty===c.type;
+      return { glyph:this.shapeGlyph(ty,26, active?c.statusColor:T.glyphOff, dark), label:lb,
+        wrapStyle:{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:6,
+          padding:'10px 4px 8px', borderRadius:16, background:T.bg,
+          boxShadow: active? inset(3,7) : raised(3,7),
+          transition:'box-shadow .3s' },
+        labelStyle:{ fontSize:10.5, fontWeight:active?700:600, letterSpacing:0.2,
+          color: active? c.statusColor : T.dim, transition:'color .3s' } };
+    });
+
+    /* sectors */
+    const SDEF=[{key:'delete',a1:-76,a2:-42},{key:'var1',a1:-42,a2:-14},{key:'var2',a1:14,a2:42},{key:'target',a1:42,a2:76}];
+    const sectorsView=SDEF.map(d=>{
+      const m=this.meta(d.key), active=s.activeSector===d.key;
+      const mid=(d.a1+d.a2)/2, [dx,dy]=this.pt(mid,G.R);
+      return { key:d.key, stripD:this.arc(d.a1+3,d.a2-3,G.R+15), color:m.color,
+        stripOpacity: active?1:0.5,
+        icon:this.roleIcon(m.role, active?'#fff':m.color),
+        dotStyle:{ position:'absolute', left:dx+'px', top:dy+'px', transform:'translate(-50%,-50%)',
+          width:34, height:34, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+          background: active? m.color : T.bg,
+          boxShadow: active? `0 0 14px ${m.color}, ${raised(2,5)}` : raised(3,6),
+          zIndex:2, pointerEvents:'none', transition:'background .2s, box-shadow .2s' } };
+    });
+    const [hx,hy]=this.pt(0,G.R+15);
+
+    /* context line */
+    let ctxText, ctxColor, ctxSub;
+    if(s.dragging){
+      const k=s.activeSector;
+      if(!k){ ctxText='Отпустите, чтобы вернуть фигуру'; ctxColor=T.dim; ctxSub='Нейтральная зона · 12:00'; }
+      else { const m=this.meta(k); ctxText=m.label; ctxColor=m.color;
+        ctxSub = k==='delete' ? 'Запросим причину'
+          : k==='interact' ? 'Активное действие'
+          : m.input==='dictation' ? 'Голосовой ввод'
+          : m.input==='comment' ? 'С комментарием'
+          : m.role==='go' ? 'Целевое действие' : 'Вариативное действие'; }
+    } else { ctxText='Удерживайте фигуру и ведите по дуге'; ctxColor=T.dim;
+      ctxSub='← удалить · → '+c.target.label.toLowerCase()+' · ↓ '+interactShort; }
+
+    /* overlay */
+    const ov=s.overlay;
+    const overlayOpen=!!ov;
+    let chips=[];
+    if(ov){
+      const sets={ reason:['Дубль','Нерелевантно','Спам','Закрыто без сделки'],
+        comment:['Готово','Нужны правки','Согласовано','Отклонено'], dictation:[] };
+      chips=(sets[ov.kind]||[]).map(t=>({ label:t, onClick:()=>this.setState({overlayText:t}),
+        style:{ padding:'9px 15px', borderRadius:20, fontSize:13.5, fontWeight:600, cursor:'pointer',
+          color:T.text, background:T.bg, boxShadow:raised(3,7) } }));
+    }
+    const waveBars=[0.5,0.85,0.35,1,0.6,0.95,0.45,0.8,0.4,0.7,0.55].map((h,i)=>({
+      style:{ width:5, borderRadius:3, height:48, background:ov?ov.color:AMBER,
+        transformOrigin:'bottom', transform:`scaleY(${h})`,
+        animation:`wv ${0.5+ (i%4)*0.12}s ease-in-out ${i*0.05}s infinite` } }));
+    const accent= ov?ov.color:AMBER;
+    const showText = !!(ov && s.overlayText && !s.recording);
+    const showPrompt = !!(ov && !s.overlayText && !s.recording);
+    const showMic = !!(ov && (ov.kind==='dictation' || ov.kind==='comment'));
+    const sendOk = !(ov && ov.kind==='reason') || !!s.overlayText.trim();
+
+    /* done */
+    const doneView=s.doneStack.map(d=>({ glyph:this.shapeGlyph(d.type,30,d.color,dark),
+      wrapStyle:{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
+        background:T.bg, boxShadow:raised(3,8), animation:'pop .4s ease both' } }));
+    const dc=s.doneStack.length;
+    const doneWord = dc%10===1&&dc%100!==11 ? 'задачу' : (dc%10>=2&&dc%10<=4&&(dc%100<10||dc%100>=20)?'задачи':'задач');
+
+    /* interaction surfaces */
+    const inter=s.interaction, interactionOpen=!!inter, ik=inter?inter.kind:'';
+    const isCall=ik==='call', isView=ik==='view', isCamera=ik==='camera', isChecklist=ik==='checklist';
+    const callName=(c.title||'').replace(/^Звонок:\s*/,'');
+    const np=callName.split(' '); const callInitials=(((np[0]||'')[0]||'')+((np[1]||'')[0]||'')).toUpperCase();
+    const mm=String(Math.floor(s.callSecs/60)).padStart(2,'0'), ssx=String(s.callSecs%60).padStart(2,'0');
+    const callStatus= s.callSecs<2 ? 'Идёт вызов…' : ('Соединено · '+mm+':'+ssx);
+    const shotLabel= s.shots>0 ? (s.shots+' фото') : 'Нет фото';
+    const clItems=((c.interact||{}).items)||[];
+    const ckArr= s.checks.length? s.checks : clItems.map((_,i)=>i<3);
+    const doneN= ckArr.filter(Boolean).length;
+    const checkItems= clItems.map((lb,i)=>({ label:lb, onClick:()=>this.toggleCheck(i),
+      rowStyle:{ display:'flex', alignItems:'center', gap:14, padding:'15px 16px', borderRadius:16,
+        background:T.bg, boxShadow:raised(3,7), marginBottom:10, cursor:'pointer' },
+      boxStyle:{ width:26, height:26, borderRadius:8, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+        background: ckArr[i]?INTERACT:T.bg, boxShadow: ckArr[i]?'none':inset(2,4) },
+      check: ckArr[i]? this.svgIcon([React.createElement('path',{key:1,d:'M4.5 12.5l5 5 10-11'})],'#fff',15) : null,
+      labelStyle:{ fontSize:15.5, fontWeight: ckArr[i]?600:700, color: ckArr[i]?T.dim:T.text, textDecoration: ckArr[i]?'line-through':'none' } }));
+    const viewFields=[ {k:'Статус',v:c.statusLabel}, {k:'Контрагент',v:c.company}, {k:'Данные',v:c.line1}, {k:'Срок',v:c.line2} ].map(f=>({ k:f.k, v:f.v,
+      rowStyle:{ display:'flex', justifyContent:'space-between', gap:12, padding:'11px 0', borderBottom:'1px solid #ece6db' },
+      kStyle:{ fontSize:13.5, fontWeight:600, color:'#9a9486' },
+      vStyle:{ fontSize:14.5, fontWeight:700, color:'#2a2620', textAlign:'right' } }));
+    const viewBody=(c.type==='doc'
+      ? ['Настоящий акт составлен в подтверждение взаимных расчётов между сторонами по состоянию на отчётную дату.','Расхождений по суммам не выявлено. Документ требует подписи уполномоченного лица.']
+      : [c.reason,'Следующий шаг по сделке закреплён за вами. Откройте карточку для детальной работы и истории взаимодействий.'])
+      .map(t=>({ t, style:{ fontSize:14.5, lineHeight:'22px', color:'#46413a', marginTop:14, textWrap:'pretty' } }));
+    const darkSurf='linear-gradient(165deg,#2b3340,#1b202a)';
+    const iconW=(d,sz)=>this.svgIcon([React.createElement('path',{key:1,d})], '#fff', sz||20);
+
+    return {
+      frameDark:dark,
+      track:T.track, track2:T.track2, grooveShade:T.gShade,
+      grooveD:this.arc(-G.FAN,G.FAN,G.R), homeY:hy-6.5,
+      screenStyle:{ position:'relative', width:'100%', height:'100%', background:T.bg,
+        overflow:'hidden', fontFamily:"'Manrope',system-ui,sans-serif", color:T.text,
+        touchAction:'none', userSelect:'none', WebkitUserSelect:'none' },
+
+      /* info zone */
+      infoStyle:{ position:'relative', padding:'68px 22px 0', zIndex:2 },
+      flowLabelStyle:{ fontSize:12, fontWeight:800, letterSpacing:3, color:T.dim },
+      queueCountStyle:{ fontSize:12.5, fontWeight:700, color:T.dim },
+      queueCount:s.queue.length,
+      legend,
+      badgeStyle:{ display:'inline-flex', alignItems:'center', gap:7, padding:'6px 13px 6px 11px',
+        borderRadius:20, background:T.bg, boxShadow:raised(3,7),
+        fontSize:12.5, fontWeight:700, color:c.statusColor, marginBottom:13 },
+      badgeDotStyle:{ width:9, height:9, borderRadius:'50%', background:c.statusColor,
+        boxShadow:`0 0 8px ${c.statusColor}` },
+      statusLabel:c.statusLabel,
+      titleStyle:{ fontSize:29, fontWeight:800, lineHeight:'34px', letterSpacing:-0.4, color:T.text, textWrap:'pretty' },
+      title:c.title,
+      companyStyle:{ fontSize:16, fontWeight:600, color:T.dim, marginTop:6 },
+      company:c.company,
+      line1Style:{ fontSize:16.5, fontWeight:700, color:T.text, whiteSpace:'nowrap' },
+      line1:c.line1,
+      line2Style:{ fontSize:14.5, fontWeight:500, color:T.dim, marginTop:5 },
+      line2:c.line2,
+      showPriority,
+      engineStyle:{ marginTop:18, padding:'13px 15px', borderRadius:18, background:T.bg, boxShadow:inset(3,7) },
+      engineLabelStyle:{ fontSize:10.5, fontWeight:800, letterSpacing:1.5, color:T.dim },
+      engineScoreStyle:{ fontSize:13, fontWeight:800, color:c.statusColor },
+      meterTrackStyle:{ height:7, borderRadius:5, background:T.track, boxShadow:inset(1,3), overflow:'hidden' },
+      meterFillStyle:{ height:'100%', width:c.priority+'%', borderRadius:5,
+        background:`linear-gradient(90deg, ${this.shade(c.statusColor,0.15)}, ${c.statusColor})`,
+        transition:'width .5s' },
+      reasonStyle:{ fontSize:12.5, fontWeight:500, color:T.dim, marginTop:9, lineHeight:'17px' },
+      priority:c.priority, reason:c.reason,
+
+      /* context */
+      ctxWrapStyle:{ position:'relative', marginTop:16, padding:'16px 24px 0', textAlign:'center', zIndex:2 },
+      dividerStyle:{ height:3, borderRadius:3, margin:'0 -24px 16px', background:T.track,
+        boxShadow:`inset 0 1px 2px ${T.sD}, inset 0 -1px 2px ${T.sL}` },
+      ctxTextStyle:{ fontSize:19, fontWeight:800, color:ctxColor, letterSpacing:-0.2, transition:'color .2s' },
+      ctxSubStyle:{ fontSize:12.5, fontWeight:600, color:T.faint, marginTop:4 },
+      ctxText, ctxSub,
+
+      /* sectors + well */
+      sectorsView,
+      wellStyle:{ position:'absolute', left:G.CX+'px', top:G.PY+'px', transform:'translate(-50%,-50%)',
+        width:80, height:80, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+        background: s.activeSector==='interact'? INTERACT : T.bg,
+        boxShadow: s.activeSector==='interact' ? `0 0 22px ${INTERACT}, 0 8px 18px ${INTERACT}66` : inset(4,9),
+        zIndex:2, pointerEvents:'none', transition:'background .2s, box-shadow .2s' },
+      wellRippleStyle:{ display:'none' },
+      wellIcon:this.interactIcon((c.interact||{}).kind, s.activeSector==='interact'?'#fff':T.faint),
+
+      /* figure */
+      figureStyle:this.computeFigure(dark),
+      figureEl:this.shapeGlyph(c.type, G.FIG, c.statusColor, dark),
+      setScreenRef:this.setScreenRef, onFigureDown:this.onFigureDown,
+
+      /* overlay */
+      overlayOpen,
+      overlayBackdropStyle:{ position:'absolute', inset:0, zIndex:20, display:'flex', flexDirection:'column',
+        justifyContent:'flex-end', background: dark?'rgba(10,11,13,0.55)':'rgba(60,55,48,0.32)',
+        backdropFilter:'blur(3px)', WebkitBackdropFilter:'blur(3px)' },
+      panelStyle:{ background:T.bg, borderRadius:'46px 46px 0 0', padding:'26px 24px 38px',
+        boxShadow:`0 -8px 40px rgba(0,0,0,0.18)`, animation:'slideUp .35s cubic-bezier(.2,.8,.3,1) both',
+        borderTop:`1px solid ${dark?'#383b42':'#fff'}` },
+      panelKickerStyle:{ fontSize:11, fontWeight:800, letterSpacing:1.5, color:ov?ov.color:T.dim },
+      panelTitleStyle:{ fontSize:23, fontWeight:800, color:T.text, marginTop:3 },
+      overlayKicker: ov ? (ov.kind==='reason'?'ПРИЧИНА УДАЛЕНИЯ':ov.kind==='dictation'?'ГОЛОСОВОЙ ВВОД':'КОММЕНТАРИЙ') : '',
+      overlayLabel: ov?ov.label:'',
+      closeBtnStyle:{ width:38, height:38, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+        background:T.bg, boxShadow:raised(3,7), cursor:'pointer' },
+      closeIcon:this.svgIcon([React.createElement('path',{key:1,d:'M6 6l12 12M18 6L6 18'})],T.dim,16),
+      panelObjStyle:{ fontSize:13.5, fontWeight:600, color:T.dim, marginTop:6 },
+      inputAreaStyle:{ marginTop:18, minHeight:96, padding:'16px 18px', borderRadius:24,
+        background:T.bg, boxShadow:inset(4,9), display:'flex', alignItems:'center',
+        justifyContent: s.recording?'center':'flex-start' },
+      recording:s.recording, waveBars,
+      showText, transcriptStyle:{ fontSize:16, fontWeight:600, color:T.text, lineHeight:'23px' },
+      showPrompt, promptStyle:{ fontSize:15, fontWeight:500, color:T.faint },
+      promptText: ov && ov.kind==='reason' ? 'Выберите причину или продиктуйте' : 'Нажмите микрофон и говорите, либо выберите вариант',
+      overlayText:s.overlayText,
+      chips,
+      showMic, micIcon: s.recording
+        ? React.createElement('div',{style:{width:18,height:18,borderRadius:4,background:'#fff'}})
+        : this.svgIcon([React.createElement('path',{key:1,d:'M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3z'}),React.createElement('path',{key:2,d:'M5 11a7 7 0 0014 0M12 18v3'})],'#fff',22),
+      micBtnStyle:{ width:58, height:58, borderRadius:'50%', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+        cursor:'pointer', background: s.recording? RED : accent,
+        boxShadow:`0 6px 16px ${(s.recording?RED:accent)}66`,
+        animation: s.recording?'mpulse 1s ease-in-out infinite':'none' },
+      sendLabel: ov && ov.kind==='reason' ? 'Удалить и сжечь' : 'Отправить',
+      sendBtnStyle:{ flex:1, height:58, borderRadius:30, display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:16.5, fontWeight:800, color:'#fff', cursor: sendOk?'pointer':'default',
+        background: sendOk? accent : T.faint, opacity: sendOk?1:0.6,
+        boxShadow: sendOk? `0 6px 18px ${accent}55`:'none', transition:'background .2s, opacity .2s' },
+      onMic:this.onMic, onSend:this.onSend, onCancel:this.onCancel,
+
+      /* inbox */
+      inbox:s.inbox,
+      inboxStyle:{ position:'absolute', inset:0, zIndex:30, display:'flex', flexDirection:'column',
+        alignItems:'center', justifyContent:'center', textAlign:'center', padding:'0 36px',
+        background:T.bg },
+      burstStyle:{ position:'absolute', left:'50%', top:'42%', width:200, height:200, borderRadius:'50%',
+        background:`radial-gradient(circle, ${GREEN}, transparent 70%)`, animation:'burst 1.1s ease-out 1' },
+      inboxIconWrapStyle:{ width:96, height:96, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+        background:T.bg, boxShadow:raised(6,16), marginBottom:26, position:'relative', zIndex:1 },
+      inboxCheck:this.svgIcon([React.createElement('path',{key:1,d:'M4.5 12.5l5 5 10-11'})],GREEN,44),
+      inboxTitleStyle:{ fontSize:34, fontWeight:800, color:T.text, letterSpacing:-0.6, position:'relative', zIndex:1 },
+      inboxSubStyle:{ fontSize:15.5, fontWeight:500, color:T.dim, marginTop:10, lineHeight:'22px', maxWidth:280 },
+      doneView, doneCount:dc, doneWord,
+      resetBtnStyle:{ padding:'15px 32px', borderRadius:30, fontSize:16, fontWeight:800, color:T.text,
+        background:T.bg, boxShadow:raised(5,12), cursor:'pointer' },
+      onReset:this.onReset,
+
+      /* interaction */
+      interactionOpen, isCall, isView, isCamera, isChecklist, flashOn:s.flash,
+      interStyle:{ position:'absolute', inset:0, zIndex:25, display:'flex', flexDirection:'column',
+        alignItems:'center', background:(isCall||isCamera)?darkSurf:T.bg,
+        padding: isCall?'76px 28px 44px':'0', animation:'slideUp .32s ease both', overflow:'hidden' },
+      flashStyle:{ position:'absolute', inset:0, background:'#fff', zIndex:6, pointerEvents:'none', animation:'flash .2s ease-out both' },
+      overlayLabel2: inter?inter.label:'',
+      callTopStyle:{ fontSize:12.5, fontWeight:700, letterSpacing:1.5, color:'rgba(255,255,255,0.5)' },
+      avatarStyle:{ marginTop:30, width:106, height:106, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:38, fontWeight:800, color:'#fff', background:'linear-gradient(145deg,#4E8C86,#365f5b)', boxShadow:'0 14px 32px rgba(0,0,0,0.4)' },
+      callInitials, callName, callNumber:c.line1, callStatus,
+      callNameStyle:{ marginTop:22, fontSize:27, fontWeight:800, color:'#fff', whiteSpace:'nowrap' },
+      callNumStyle:{ marginTop:7, fontSize:16, fontWeight:600, color:'rgba(255,255,255,0.55)' },
+      callStatusStyle:{ marginTop:16, fontSize:15, fontWeight:700, color:'#7fd0c6' },
+      callCtrlRowStyle:{ marginTop:'auto', display:'flex', gap:20, marginBottom:24 },
+      callCtrlStyle:{ width:62, height:62, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+        background:'rgba(255,255,255,0.13)', color:'#fff' },
+      micCtrlIcon:iconW('M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 18v3'),
+      padCtrlIcon:this.svgIcon([6,12,18].flatMap((y,r)=>[6,12,18].map((x,ci)=>React.createElement('circle',{key:r+'-'+ci,cx:x,cy:y,r:1.6,fill:'#fff',stroke:'none'}))),'#fff',20),
+      spkCtrlIcon:iconW('M4 9v6h4l5 4V5L8 9H4zM16 8a5 5 0 010 8M18.5 5.5a9 9 0 010 13'),
+      endCallStyle:{ width:74, height:74, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+        background:'#E5484D', cursor:'pointer', boxShadow:'0 10px 26px rgba(229,72,77,0.5)' },
+      endCallIcon:React.createElement('div',{style:{transform:'rotate(134deg)',display:'flex'}}, iconW('M6.5 4h3l1.5 4-2 1.5a12 12 0 005.5 5.5L16 17l4 1.5V21a1.5 1.5 0 01-1.6 1.5A16.5 16.5 0 013.5 5.6 1.5 1.5 0 015 4z',24)),
+      viewBarStyle:{ padding:'58px 16px 12px', display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%' },
+      viewCloseStyle:{ width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+        background:T.bg, boxShadow:raised(3,7), cursor:'pointer', flexShrink:0 },
+      backIcon:this.svgIcon([React.createElement('path',{key:1,d:'M14 6l-6 6 6 6'})],T.dim,18),
+      viewBarTitleStyle:{ fontSize:17, fontWeight:800, color:T.text, flex:1, textAlign:'center', padding:'0 8px' },
+      viewEditStyle:{ width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+        background:T.bg, boxShadow:raised(3,7), cursor:'pointer', flexShrink:0 },
+      editIcon:this.svgIcon([React.createElement('path',{key:1,d:'M4 20h4L18.5 9.5a2.1 2.1 0 00-3-3L5 17z'}),React.createElement('path',{key:2,d:'M13.5 8l3 3'})],INTERACT,17),
+      checkProgStyle:{ fontSize:13, fontWeight:800, color:INTERACT, minWidth:46, textAlign:'right' },
+      checkProgress:doneN+' из '+clItems.length,
+      viewScrollStyle:{ flex:1, overflowY:'auto', width:'100%', padding:'4px 18px 14px' },
+      paperStyle:{ background:'#fffdf8', borderRadius:18, padding:'24px 22px', boxShadow:raised(4,12), color:'#2a2620' },
+      paperTitleStyle:{ fontSize:21, fontWeight:800, color:'#2a2620', textWrap:'pretty' },
+      paperCompanyStyle:{ fontSize:14.5, fontWeight:600, color:'#7a7468', marginTop:4, marginBottom:14 },
+      paperFieldsStyle:{ borderTop:'1px solid #ece6db', marginBottom:4 },
+      viewFields, viewBody, checkItems,
+      viewDoneStyle:{ margin:'10px 18px 40px', height:54, borderRadius:28, display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:16.5, fontWeight:800, color:'#fff', background:INTERACT, boxShadow:`0 6px 18px ${INTERACT}55`, cursor:'pointer' },
+      camTopStyle:{ paddingTop:62, fontSize:14, fontWeight:700, color:'rgba(255,255,255,0.85)', textAlign:'center', width:'100%' },
+      camTitle:'Приёмка · '+(c.company||''),
+      camFrameStyle:{ flex:1, width:'100%', position:'relative', display:'flex', alignItems:'center', justifyContent:'center' },
+      camHintStyle:{ fontSize:15, fontWeight:600, color:'rgba(255,255,255,0.6)', maxWidth:220, textAlign:'center' },
+      camHint:'Наведите камеру на товар и сделайте снимки приёмки',
+      camBracketTL:{ position:'absolute', top:'20%', left:'13%', width:34, height:34, borderTop:'3px solid rgba(255,255,255,0.8)', borderLeft:'3px solid rgba(255,255,255,0.8)', borderTopLeftRadius:6 },
+      camBracketTR:{ position:'absolute', top:'20%', right:'13%', width:34, height:34, borderTop:'3px solid rgba(255,255,255,0.8)', borderRight:'3px solid rgba(255,255,255,0.8)', borderTopRightRadius:6 },
+      camBracketBL:{ position:'absolute', bottom:'20%', left:'13%', width:34, height:34, borderBottom:'3px solid rgba(255,255,255,0.8)', borderLeft:'3px solid rgba(255,255,255,0.8)', borderBottomLeftRadius:6 },
+      camBracketBR:{ position:'absolute', bottom:'20%', right:'13%', width:34, height:34, borderBottom:'3px solid rgba(255,255,255,0.8)', borderRight:'3px solid rgba(255,255,255,0.8)', borderBottomRightRadius:6 },
+      camBottomStyle:{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'18px 30px 48px' },
+      camCountStyle:{ width:64, fontSize:13, fontWeight:700, color:'rgba(255,255,255,0.7)' },
+      shotLabel,
+      shutterStyle:{ width:72, height:72, borderRadius:'50%', border:'4px solid #fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' },
+      shutterInnerStyle:{ width:56, height:56, borderRadius:'50%', background:'#fff' },
+      camDoneStyle:{ width:64, textAlign:'right', fontSize:16, fontWeight:800, color: s.shots>0?'#7fd0c6':'rgba(255,255,255,0.55)', cursor:'pointer' },
+      camDoneLabel: s.shots>0?'Готово':'Отмена',
+      camCloseStyle:{ position:'absolute', top:58, right:20, width:38, height:38, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.15)', cursor:'pointer' },
+      closeIconW:this.svgIcon([React.createElement('path',{key:1,d:'M6 6l12 12M18 6L6 18'})],'#fff',16),
+      onCloseInteraction:this.onCloseInteraction, onShutter:this.onShutter
+    };
+  }
+}
+</script>
+</body>
+</html>

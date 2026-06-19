@@ -1,7 +1,0 @@
-[Unit]
-Description=JBrealty backup failure alert
-
-[Service]
-Type=oneshot
-EnvironmentFile=-/var/www/jbrealty/server/.env
-ExecStart=/bin/bash -c 'curl -sf -X POST "${BACKUP_ALERT_WEBHOOK}" -H "Content-Type: application/json" -d "{\"text\":\"JBrealty: daily backup FAILED\"}" || true'

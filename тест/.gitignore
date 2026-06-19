@@ -1,0 +1,3 @@
+**/logs/*.log
+**/logs/report.md
+logs/suite-report.md

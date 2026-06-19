@@ -3,6 +3,7 @@ import { db, closeDb } from "./index.js";
 import * as schema from "./schema.js";
 import { DEFAULT_ROLES, INTEGRATOR_PERMISSIONS, MARKETER_PERMISSIONS } from "../lib/permissions.js";
 import { buildDefaultDashboard } from "../lib/analytics-defaults.js";
+import { ensureSequencerDemoEntities } from "./seed-sequencer-demo.js";
 import { hashPassword } from "../lib/auth.js";
 import { validatePassword } from "../lib/password.js";
 
@@ -144,7 +145,7 @@ async function seed() {
 
     const [realtorRole] = await db.select().from(schema.roles).where(eq(schema.roles.name, "realtor")).limit(1);
     const [rootUnit] = await db.insert(schema.orgUnits).values({
-      name: "JBrealty Demo",
+      name: "SDR CRM Demo",
       sortOrder: 0,
       description: "Демо-компания",
       defaultRoleId: realtorRole?.id ?? null,
@@ -195,6 +196,8 @@ async function seed() {
       console.log("Default analytics dashboard created");
     }
   }
+
+  await ensureSequencerDemoEntities();
 
   await closeDb();
   console.log("Seed complete");

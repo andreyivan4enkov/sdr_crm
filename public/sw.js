@@ -1,4 +1,4 @@
-const CACHE = "jbrealty-shell-v18";
+const CACHE = "sdr-crm-shell-v18";
 
 const SHELL = [
   "/manifest.webmanifest",
@@ -22,16 +22,16 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "JBrealty CRM", body: "Новое уведомление", url: "/crm" };
+  let data = { title: "SDR CRM", body: "Новое уведомление", url: "/crm" };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch { /* ignore */ }
   event.waitUntil(
-    self.registration.showNotification(data.title || "JBrealty CRM", {
+    self.registration.showNotification(data.title || "SDR CRM", {
       body: data.body || "",
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
-      tag: data.tag || "jbrealty",
+      tag: data.tag || "crm",
       data: { url: data.url || "/crm" },
     }),
   );

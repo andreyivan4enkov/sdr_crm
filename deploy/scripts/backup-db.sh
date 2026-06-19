@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Резервное копирование PostgreSQL (production)
-# systemd: deploy/systemd/jbrealty-backup.timer
-# cron: 0 3 * * * /var/www/jbrealty/deploy/scripts/backup-db.sh
+# systemd: deploy/systemd/sdr-crm-backup.timer
+# cron: 0 3 * * * /var/www/sdr-crm/deploy/scripts/backup-db.sh
 
 set -euo pipefail
 
@@ -9,11 +9,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/backup-common.sh
 source "${SCRIPT_DIR}/lib/backup-common.sh"
 
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/jbrealty}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/sdr-crm}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
-ENV_FILE="${ENV_FILE:-/var/www/jbrealty/server/.env}"
-BACKUP_LOG_FILE="${BACKUP_LOG_FILE:-/var/log/jbrealty/backup.log}"
-LOCK_FILE="${LOCK_FILE:-/var/www/jbrealty/server/data/backup.lock}"
+ENV_FILE="${ENV_FILE:-/var/www/sdr-crm/server/.env}"
+BACKUP_LOG_FILE="${BACKUP_LOG_FILE:-/var/log/sdr-crm/backup.log}"
+LOCK_FILE="${LOCK_FILE:-/var/www/sdr-crm/server/data/backup.lock}"
 MIN_SIZE_BYTES="${MIN_SIZE_BYTES:-1024}"
 
 mkdir -p "$BACKUP_DIR" "$(dirname "$BACKUP_LOG_FILE")"
@@ -36,7 +36,7 @@ if [[ "${USE_PGLITE:-}" == "1" ]]; then
 fi
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
-BASE="jbrealty_${STAMP}"
+BASE="crm_${STAMP}"
 OUT="${BACKUP_DIR}/${BASE}.sql.gz"
 TMP="${OUT}.partial"
 

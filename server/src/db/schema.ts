@@ -131,6 +131,12 @@ export const leads = pgTable("leads", {
   index("leads_created_idx").on(t.createdAt),
 ]);
 
+export const leadSdrVectors = pgTable("lead_sdr_vectors", {
+  leadId: uuid("lead_id").primaryKey().references(() => leads.id, { onDelete: "cascade" }),
+  vector: text("vector").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const leadNotes = pgTable("lead_notes", {
   id: uuid("id").primaryKey().defaultRandom(),
   leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),

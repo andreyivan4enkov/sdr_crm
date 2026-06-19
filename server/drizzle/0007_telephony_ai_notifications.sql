@@ -23,5 +23,5 @@ CREATE TABLE IF NOT EXISTS "push_subscriptions" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "push_subscriptions_user_endpoint_idx" ON "push_subscriptions" ("user_id", "endpoint");
 
-GRANT ALL ON TABLE "notification_settings" TO jbrealty;
-GRANT ALL ON TABLE "push_subscriptions" TO jbrealty;
+GRANT ALL ON TABLE "notification_settings" TO crm;
+GRANT ALL ON TABLE "push_subscriptions" TO crm;

@@ -7,6 +7,7 @@ import { FieldsSettings } from "./FieldsSettings";
 import { TotpSettings } from "./TotpSettings";
 import { PasswordSettings } from "./PasswordSettings";
 import { ProfileSettings } from "./ProfileSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { NotificationSettings } from "./NotificationSettings";
 import { BackupSettings } from "./BackupSettings";
 import { PipelinesSettings } from "./PipelinesSettings";
@@ -28,8 +29,8 @@ type Props = {
   user: AuthUser;
   data: {
     fields: { id: string; label: string; type: string }[];
-    channels: import("@jbrealty/api-client").Channel[];
-    pipelines?: import("@jbrealty/api-client").Pipeline[];
+    channels: import("@sdr-crm/api-client").Channel[];
+    pipelines?: import("@sdr-crm/api-client").Pipeline[];
   };
   updateData: (patch: Record<string, unknown>) => void;
   reload?: () => void;
@@ -101,7 +102,10 @@ export function SettingsHub({ t, user, data, updateData, reload, Btn, TInput, La
       </div>
 
       {tab === "profile" && (
-        <ProfileSettings t={t} Btn={Btn} TInput={TInput} Labeled={Labeled} />
+        <div className="space-y-6">
+          <AppearanceSettings t={t} />
+          <ProfileSettings t={t} Btn={Btn} TInput={TInput} Labeled={Labeled} />
+        </div>
       )}
       {tab === "pipelines" && tabAllowed(user, "pipelines") && (
         <PipelinesSettings
