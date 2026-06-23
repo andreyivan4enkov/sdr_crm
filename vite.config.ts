@@ -8,7 +8,15 @@ export default defineConfig({
   resolve: {
     alias: {
       "@sdr-crm/api-client": resolve(__dirname, "packages/api-client/src/index.ts"),
+      "@sdr-crm/blueprint-core": resolve(__dirname, "packages/blueprint-core/src/index.ts"),
+      "@sdr-crm/site-core": resolve(__dirname, "packages/site-core/src/index.ts"),
       "@sdr-crm/sdr-core": resolve(__dirname, "packages/sdr-core/src/index.ts"),
+      "@sdr-crm/edo-core": resolve(__dirname, "packages/edo-core/src/index.ts"),
+      "@sdr-crm/i18n/react": resolve(__dirname, "packages/i18n/src/react.tsx"),
+      "@sdr-crm/i18n": resolve(__dirname, "packages/i18n/src/index.ts"),
+      "@sdr-crm/aiboard-core": resolve(__dirname, "packages/aiboard-core/src/index.ts"),
+      "@sdr-crm/reactor-core": resolve(__dirname, "packages/reactor-core/src/index.ts"),
+      "@sdr-crm/integration-core": resolve(__dirname, "packages/integration-core/src/index.ts"),
     },
   },
   server: {

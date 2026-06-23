@@ -1,4 +1,4 @@
-/** SDR hybrid feature flags (env). */
+/** Search/analytics feature flags (env). */
 function envFlag(name: string, defaultOn = false): boolean {
   const v = process.env[name];
   if (v === undefined || v === "") return defaultOn;

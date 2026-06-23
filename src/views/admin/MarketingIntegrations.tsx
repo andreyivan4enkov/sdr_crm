@@ -49,11 +49,20 @@ type CardState = {
 const DEFAULTS: Record<string, CardState> = {
   vk: { enabled: false, webhookUrlSecret: "", groupId: "", accessToken: "" },
   yandex_direct: { enabled: false, webhookUrlSecret: "", clientLogin: "", token: "", accountId: "" },
-  yandex_metrica: { enabled: false, counterId: "", oauthToken: "", siteUrl: "" },
+  yandex_metrica: { enabled: false, webhookUrlSecret: "", counterId: "", oauthToken: "", siteUrl: "" },
   avito: { enabled: false, webhookUrlSecret: "", clientId: "", clientSecret: "", userId: "" },
 };
 
-export function MarketingIntegrations({ t, Btn, onSaved }: { t: Record<string, string>; Btn: React.FC<BtnProps>; onSaved?: () => void }) {
+export type MarketingIntegrationSection = "all" | "vk" | "yandex_direct" | "yandex_metrica" | "avito";
+
+export function MarketingIntegrations({
+  t, Btn, onSaved, section = "all",
+}: {
+  t: Record<string, string>;
+  Btn: React.FC<BtnProps>;
+  onSaved?: () => void;
+  section?: MarketingIntegrationSection;
+}) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState("");
@@ -194,14 +203,18 @@ export function MarketingIntegrations({ t, Btn, onSaved }: { t: Record<string, s
 
   if (loading) return <p className={`text-sm ${t.muted}`}>Загрузка…</p>;
 
+  const show = (part: MarketingIntegrationSection) => section === "all" || section === part;
+
   return (
     <div className="space-y-5">
       {err && <p className="text-sm text-rose-500 rounded-lg border border-rose-200 px-3 py-2">{err}</p>}
+      {section === "all" && (
       <p className={`text-sm ${t.muted}`}>
         Подключение рекламных каналов. Webhook принимает заявки в формате JSON: <code>name</code>, <code>phone</code>, <code>email</code>, <code>comment</code>, <code>pd_consent</code>.
       </p>
+      )}
 
-      {/* VK */}
+      {show("vk") && (
       <div className={`rounded-xl border p-4 ${t.surface} ${t.border}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold flex items-center gap-2 text-sm"><MessageCircle className="w-4 h-4 text-sky-600" /> ВКонтакте</h3>
@@ -219,8 +232,9 @@ export function MarketingIntegrations({ t, Btn, onSaved }: { t: Record<string, s
           <Btn t={t} variant="ghost" onClick={() => rotate("vk")} className="text-sm"><RefreshCw className="w-4 h-4" /> Новый секрет</Btn>
         </div>
       </div>
+      )}
 
-      {/* Yandex Direct */}
+      {show("yandex_direct") && (
       <div className={`rounded-xl border p-4 ${t.surface} ${t.border}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold flex items-center gap-2 text-sm"><Megaphone className="w-4 h-4 text-amber-600" /> Яндекс Директ</h3>
@@ -239,8 +253,9 @@ export function MarketingIntegrations({ t, Btn, onSaved }: { t: Record<string, s
           <Btn t={t} variant="ghost" onClick={() => rotate("yandex_direct")} className="text-sm"><RefreshCw className="w-4 h-4" /> Новый секрет</Btn>
         </div>
       </div>
+      )}
 
-      {/* Yandex Metrica */}
+      {show("yandex_metrica") && (
       <div className={`rounded-xl border p-4 ${t.surface} ${t.border}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold flex items-center gap-2 text-sm"><BarChart3 className="w-4 h-4 text-red-600" /> Яндекс Метрика</h3>
@@ -262,8 +277,9 @@ export function MarketingIntegrations({ t, Btn, onSaved }: { t: Record<string, s
           {state.yandex_metrica.enabled && <Btn t={t} variant="soft" onClick={() => saveMetrica(false)} className="text-sm">Выключить</Btn>}
         </div>
       </div>
+      )}
 
-      {/* Avito */}
+      {show("avito") && (
       <div className={`rounded-xl border p-4 ${t.surface} ${t.border}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold flex items-center gap-2 text-sm"><ShoppingBag className="w-4 h-4 text-emerald-600" /> Авито</h3>
@@ -282,6 +298,7 @@ export function MarketingIntegrations({ t, Btn, onSaved }: { t: Record<string, s
           <Btn t={t} variant="ghost" onClick={() => rotate("avito")} className="text-sm"><RefreshCw className="w-4 h-4" /> Новый секрет</Btn>
         </div>
       </div>
+      )}
     </div>
   );
 }

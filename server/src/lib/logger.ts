@@ -91,11 +91,22 @@ export const logger = {
 };
 
 export function installProcessErrorHandlers() {
+  const dev = process.env.NODE_ENV !== "production";
   process.on("uncaughtException", (err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (dev && /Aborted\(\)/.test(msg)) {
+      logger.warn("uncaughtException.pglite", { err: msg });
+      return;
+    }
     logger.logError(err, "uncaughtException");
     process.exit(1);
   });
   process.on("unhandledRejection", (reason) => {
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    if (dev && /Aborted\(\)/.test(msg)) {
+      logger.warn("unhandledRejection.pglite", { err: msg });
+      return;
+    }
     logger.logError(reason, "unhandledRejection");
   });
 }

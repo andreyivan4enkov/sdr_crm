@@ -4,13 +4,28 @@ import {
   GripVertical, History, ListTodo, MessageSquare, PanelRightClose, PanelRightOpen, Paperclip, Pin, Plus,
   Search, Send, Trash2, User, Users, AlertTriangle, X, Zap,
 } from "lucide-react";
-import { api, type AuthUser, type Lead, type Realtor, type Task, type TaskChecklistItem, type TaskComment, type TaskFile, type TaskPriority, type TaskStatus, type TeamMember } from "../api/client";
+import { EdoTaskDocuments } from "./edo/EdoTaskDocuments";
+import { api, type AuthUser, type Lead, type DealManager, type Task, type TaskChecklistItem, type TaskComment, type TaskFile, type TaskPriority, type TaskStatus, type TeamMember } from "../api/client";
 import type { CrmData } from "../hooks/useCrmData";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { taskStatusContourStyle, taskStatusBadgeStyle, taskStatusPillStyle } from "../lib/stage-colors";
 import { GlassDateTimePicker } from "../components/GlassDrumPicker";
 import { LeadAssignSection, LeadResponsibleCard, GlassAssigneeChip } from "../components/LeadPeoplePicker";
 import { memberById, uniqueWatcherMembers } from "../lib/team-members";
+import { useTheme } from "../context/ThemeProvider";
+import {
+  isNeoTheme,
+  skinAvatarRing,
+  skinCheckDone,
+  skinFilterTrack,
+  neoIconAccent,
+  neoIconAccent500,
+  skinListItemActive,
+  skinMainPanel,
+  skinPrimaryBtn,
+  skinSearchBox,
+} from "../lib/neo-ui";
+import { useTaskLabels, useUiT } from "../lib/i18n-labels";
 
 const uid = () => crypto.randomUUID();
 const CHAT_WIDTH_KEY = "jbr:taskChatWidth";
@@ -19,20 +34,6 @@ const DEFAULT_CHAT_WIDTH = 520;
 const MIN_CHAT_WIDTH = 320;
 const MAX_CHAT_WIDTH = 960;
 const MIN_DETAILS_WIDTH = 280;
-
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  new: "Новая",
-  in_progress: "В работе",
-  waiting: "Ждёт",
-  deferred: "Отложена",
-  completed: "Завершена",
-};
-
-const PRIORITY_LABELS: Record<TaskPriority, string> = {
-  low: "Низкий",
-  normal: "Обычный",
-  high: "Высокий",
-};
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
   low: "text-slate-400",
@@ -66,9 +67,9 @@ type Props = {
   initialTaskId?: string | null;
 };
 
-function teamUsers(realtors: Realtor[], user: AuthUser) {
+function teamUsers(dealManagers: DealManager[], user: AuthUser) {
   const map = new Map<string, string>();
-  for (const r of realtors) {
+  for (const r of dealManagers) {
     if (r.userId) map.set(r.userId, r.name);
   }
   if (!map.has(user.id)) map.set(user.id, user.name || user.login);
@@ -77,7 +78,7 @@ function teamUsers(realtors: Realtor[], user: AuthUser) {
 
 function taskEmployees(data: CrmData, user: AuthUser): TeamMember[] {
   if (data.employees?.length) return data.employees;
-  return teamUsers(data.realtors, user).map(({ id, name }) => ({
+  return teamUsers(data.dealManagers, user).map(({ id, name }) => ({
     id,
     name,
     avatar: null,
@@ -143,28 +144,28 @@ function addBusinessDays(days: number) {
   return d.toISOString();
 }
 
-function taskRole(task: Task, userId: string): string | null {
-  if (task.assigneeUserId === userId) return "Исполнитель";
-  if ((task.coExecutors || []).includes(userId)) return "Соисполнитель";
-  if ((task.watchers || []).includes(userId)) return "Наблюдатель";
+function taskRole(task: Task, userId: string, tr: ReturnType<typeof useUiT>["tr"]): string | null {
+  if (task.assigneeUserId === userId) return tr("roleAssignee", undefined, "tasks");
+  if ((task.coExecutors || []).includes(userId)) return tr("roleCoExecutor", undefined, "tasks");
+  if ((task.watchers || []).includes(userId)) return tr("roleWatcher", undefined, "tasks");
   return null;
 }
 
-function lastPreview(task: Task): string {
+function lastPreview(task: Task, statusMap: Record<TaskStatus, string>): string {
   const comments = task.comments || [];
   if (comments.length) return comments[comments.length - 1].text;
   if (task.pinnedResult) return `✓ ${task.pinnedResult.text}`;
   if (task.statusSummary) return task.statusSummary;
   if (task.description) return task.description;
-  return STATUS_LABELS[task.status];
+  return statusMap[task.status];
 }
 
-function buildActivityFeed(task: Task): ActivityItem[] {
+function buildActivityFeed(task: Task, tr: ReturnType<typeof useUiT>["tr"]): ActivityItem[] {
   const items: ActivityItem[] = [
     {
       id: `created-${task.id}`,
       kind: "system",
-      text: "Задача создана",
+      text: tr("taskCreated", undefined, "tasks"),
       author: task.author,
       at: task.createdAt,
     },
@@ -173,7 +174,7 @@ function buildActivityFeed(task: Task): ActivityItem[] {
     items.push({
       id: `done-${task.id}`,
       kind: "system",
-      text: "Задача завершена",
+      text: tr("taskCompleted", undefined, "tasks"),
       at: task.completedAt,
     });
   }
@@ -205,6 +206,9 @@ export function TasksPage({
   t, data, user, updateData, onOpenLead,
   selectedTaskId, onSelectTask, onNavigateBack, initialTaskId,
 }: Props) {
+  const { theme } = useTheme();
+  const { tr } = useUiT();
+  const { statusMap, priorityMap } = useTaskLabels();
   const [filter, setFilter] = useState<Filter>("open");
   const [search, setSearch] = useState("");
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(selectedTaskId ?? initialTaskId ?? null);
@@ -220,7 +224,7 @@ export function TasksPage({
     if (!onSelectTask && initialTaskId) setInternalSelectedId(initialTaskId);
   }, [initialTaskId, onSelectTask]);
 
-  const members = useMemo(() => taskEmployees(data, user), [data.employees, data.realtors, user]);
+  const members = useMemo(() => taskEmployees(data, user), [data.employees, data.dealManagers, user]);
   const tasks = useMemo(() => data.tasks.map(normalizeTask), [data.tasks]);
   const myName = user.name || user.login;
 
@@ -311,37 +315,37 @@ export function TasksPage({
   }
 
   const filters: { k: Filter; label: string }[] = [
-    { k: "open", label: "В работе" },
-    { k: "mine", label: "Мои" },
-    { k: "overdue", label: "Просрочены" },
-    { k: "all", label: "Все" },
+    { k: "open", label: tr("tabOpen", undefined, "tasks") },
+    { k: "mine", label: tr("tabMine", undefined, "tasks") },
+    { k: "overdue", label: tr("tabOverdue", undefined, "tasks") },
+    { k: "all", label: tr("tabAll", undefined, "tasks") },
   ];
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-2">
+    <div className="tasks-page flex flex-col flex-1 min-h-0 gap-2">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 shrink-0">
         <div className="flex items-center gap-2 shrink-0">
-          <ListTodo className="w-5 h-5 text-teal-600" />
-          <h2 className="font-semibold">Задачи</h2>
+          <ListTodo className={`w-5 h-5 ${neoIconAccent(theme)}`} />
+          <h2 className="font-semibold">{tr("pageTitle", undefined, "tasks")}</h2>
         </div>
-        <div className={`flex-1 flex items-center gap-2 rounded-xl border px-3 py-2 ${t.border} ${t.surface}`}>
+        <div className={`tasks-search flex-1 flex items-center gap-2 rounded-xl px-3 py-2 ${skinSearchBox(theme, t)}`}>
           <Search className={`w-4 h-4 shrink-0 ${t.muted}`} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск…"
+            placeholder={tr("searchPlaceholder", undefined, "tasks")}
             className={`flex-1 bg-transparent border-0 outline-none text-sm min-w-0 ${t.text} placeholder:opacity-50`}
           />
           {search && (
             <button type="button" onClick={() => setSearch("")} className={t.muted}><X className="w-3.5 h-3.5" /></button>
           )}
         </div>
-        <div className={`flex gap-1 rounded-xl p-1 ${t.chip} overflow-x-auto nice-scroll w-full sm:w-auto`}>
+        <div className={`tasks-filter-track flex gap-1 rounded-xl p-1 ${skinFilterTrack(theme, t)} overflow-x-auto nice-scroll w-full sm:w-auto`}>
           {filters.map((f) => (
-            <button key={f.k} type="button" onClick={() => setFilter(f.k)}
+            <button key={f.k} type="button" onClick={() => setFilter(f.k)} data-active={filter === f.k ? "true" : "false"}
               className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition flex-1 sm:flex-none ${
-                filter === f.k ? `${t.surface} shadow-sm font-medium` : t.muted
+                filter === f.k ? (isNeoTheme(theme) ? `${t.surface} shadow-sm font-medium` : "font-medium") : t.muted
               }`}>
               {f.label}
             </button>
@@ -367,7 +371,7 @@ export function TasksPage({
       )}
 
       {/* Main workspace: list + detail/chat */}
-      <div className={`flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border ${t.surface} ${t.border}`}>
+      <div className={`tasks-main-panel flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border ${skinMainPanel(theme, t)}`}>
         <div className="flex-1 flex min-h-0 overflow-hidden">
           {/* Task chat list (messenger style) */}
           <div className={`w-full lg:w-[260px] xl:w-[280px] shrink-0 flex flex-col border-r ${t.border} min-h-0 ${selected ? "hidden lg:flex" : "flex"}`}>
@@ -389,7 +393,7 @@ export function TasksPage({
                   task={task}
                   active={selectedId === task.id}
                   leadName={lead(task.leadId)?.name}
-                  role={taskRole(task, user.id)}
+                  role={taskRole(task, user.id, tr)}
                   members={members}
                   onSelect={() => setSelectedId(task.id)}
                   onToggle={(e) => void quickToggle(task, e)}
@@ -442,24 +446,22 @@ function TaskListItem({ t, task, active, leadName, role, members, onSelect, onTo
   onSelect: () => void;
   onToggle: (e: React.MouseEvent) => void;
 }) {
+  const { theme } = useTheme();
+  const { statusMap } = useTaskLabels();
   const assigneeName = members.find((m) => m.id === task.assigneeUserId)?.name || task.assignee;
-  const preview = lastPreview(task);
+  const preview = lastPreview(task, statusMap);
   const commentCount = (task.comments || []).length;
   const progress = checklistProgress(task);
 
   return (
     <div role="button" tabIndex={0} onClick={onSelect} onKeyDown={(e) => { if (e.key === "Enter") onSelect(); }}
-      className={`w-full text-left px-3 py-3 transition flex gap-2.5 cursor-pointer mx-1 my-0.5 rounded-lg border ${active ? "bg-teal-50/90 dark:bg-teal-500/10" : t.hover}`}
+      className={`task-list-item w-full text-left px-3 py-3 flex gap-2.5 cursor-pointer mx-1 my-0.5 rounded-lg border ${skinListItemActive(theme, active) || t.hover}`}
       style={taskStatusContourStyle(task.status, active)}>
       <button type="button" onClick={onToggle}
-        className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${
-          task.done ? "bg-teal-600 border-teal-600 text-white" : `${t.border} hover:border-teal-400`
-        }`}>
+        className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition ${skinCheckDone(theme, task.done, t)}`}>
         {task.done ? <Check className="w-3 h-3" /> : <Circle className="w-2.5 h-2.5 opacity-30" />}
       </button>
-      <div className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-xs font-semibold ${
-        active ? "bg-teal-600 text-white" : "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200"
-      }`}>
+      <div className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-xs font-semibold ${skinAvatarRing(theme, active)}`}>
         {initials(assigneeName)}
       </div>
       <div className="flex-1 min-w-0 crm-data">
@@ -469,10 +471,10 @@ function TaskListItem({ t, task, active, leadName, role, members, onSelect, onTo
         </div>
         <p className={`text-xs truncate mt-0.5 ${t.muted} crm-data`}>{preview}</p>
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0" style={taskStatusBadgeStyle(task.status)}>{STATUS_LABELS[task.status]}</span>
-          {isOverdue(task) && <span className="text-[10px] text-rose-600 font-medium">Просрочена</span>}
+          <span className="task-status-badge text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0" style={taskStatusBadgeStyle(task.status, theme.colorMode, theme.uiSkin)}>{statusMap[task.status]}</span>
+          {isOverdue(task) && <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">Просрочена</span>}
           {task.dueAt && !task.done && (
-            <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue(task) ? "text-rose-600" : t.muted}`}>
+            <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue(task) ? "text-rose-600 dark:text-rose-400" : t.muted}`}>
               <Clock className="w-3 h-3" /> {formatDue(task.dueAt)}
             </span>
           )}
@@ -481,10 +483,10 @@ function TaskListItem({ t, task, active, leadName, role, members, onSelect, onTo
               <MessageSquare className="w-3 h-3" /> {commentCount}
             </span>
           )}
-          {task.pinnedResult && <Pin className="w-3 h-3 text-teal-600" />}
+          {task.pinnedResult && <Pin className={`w-3 h-3 ${neoIconAccent(theme)}`} />}
           {progress && <span className={`text-[10px] ${t.muted}`}>{progress.done}/{progress.total}</span>}
           {leadName && <span className={`text-[10px] truncate max-w-[80px] ${t.muted}`}>· {leadName}</span>}
-          {role && <span className="text-[10px] text-teal-600 dark:text-teal-400">{role}</span>}
+          {role && <span className={`text-[10px] ${neoIconAccent(theme)}`}>{role}</span>}
         </div>
       </div>
       <Flag className={`w-3 h-3 mt-1 shrink-0 ${PRIORITY_COLOR[task.priority]}`} />
@@ -500,6 +502,7 @@ function QuickCreateBar({ t, members, user, saving, onCreate, onMore }: {
   onCreate: (body: Partial<Task> & { text: string }) => Promise<void>;
   onMore: () => void;
 }) {
+  const { theme } = useTheme();
   const [text, setText] = useState("");
   const [assigneeUserId, setAssigneeUserId] = useState(user.id);
   const [submitting, setSubmitting] = useState(false);
@@ -517,8 +520,8 @@ function QuickCreateBar({ t, members, user, saving, onCreate, onMore }: {
   }
 
   return (
-    <div className="bio-glass-bar flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2.5 min-w-0">
-      <Zap className="w-4 h-4 text-teal-500 shrink-0" strokeWidth={2.25} />
+    <div className="tasks-quick-bar bio-glass-bar flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2.5 min-w-0">
+      <Zap className={`w-4 h-4 shrink-0 ${neoIconAccent500(theme)}`} strokeWidth={2.25} />
       <input
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -537,7 +540,7 @@ function QuickCreateBar({ t, members, user, saving, onCreate, onMore }: {
           type="button"
           onClick={() => void submit()}
           disabled={saving || submitting || !text.trim()}
-          className="px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40 shadow-sm shadow-teal-600/20 transition"
+          className={skinPrimaryBtn(theme)}
         >
           {submitting ? "…" : "Создать"}
         </button>
@@ -545,7 +548,7 @@ function QuickCreateBar({ t, members, user, saving, onCreate, onMore }: {
           type="button"
           onClick={onMore}
           title="Подробнее"
-          className={`hidden sm:inline-flex px-3 py-1.5 rounded-full text-xs font-medium bio-glass-chip ${t.muted} hover:text-teal-600 transition`}
+          className={`hidden sm:inline-flex px-3 py-1.5 rounded-full text-xs font-medium bio-glass-chip ${t.muted} ${isNeoTheme(theme) ? "" : "hover:text-teal-600"} transition`}
         >
           Подробнее
         </button>
@@ -575,6 +578,9 @@ function TaskWorkspace({ t, task, leads, lead, members, user, onBack, onPatch, o
   onDelete: () => void;
   onOpenLead: (id: string) => void;
 }) {
+  const { theme } = useTheme();
+  const { statusMap } = useTaskLabels();
+  const { tr } = useUiT();
   const workspaceRef = useRef<HTMLDivElement>(null);
   const isLg = useMediaQuery("(min-width: 1024px)");
   const [chatOpen, setChatOpen] = useState(() => localStorage.getItem(CHAT_OPEN_KEY) !== "0");
@@ -656,10 +662,10 @@ function TaskWorkspace({ t, task, leads, lead, members, user, onBack, onPatch, o
             <h2 className={`text-sm sm:text-base font-semibold truncate crm-data ${task.done ? "line-through opacity-60" : ""}`}>{task.text}</h2>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <span
-                className="text-[10px] px-1.5 py-0.5 rounded-full font-medium lg:hidden"
-                style={taskStatusBadgeStyle(task.status)}
+                className="task-status-badge text-[10px] px-1.5 py-0.5 rounded-full font-medium lg:hidden"
+                style={taskStatusBadgeStyle(task.status, theme.colorMode, theme.uiSkin)}
               >
-                {STATUS_LABELS[task.status]}
+                {statusMap[task.status]}
               </span>
               <p className={`text-[10px] sm:text-xs ${t.muted} truncate`}>
                 {new Date(task.createdAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
@@ -668,14 +674,14 @@ function TaskWorkspace({ t, task, leads, lead, members, user, onBack, onPatch, o
             </div>
           </div>
           {isLg && (
-            <button type="button" onClick={toggleChat} title={chatOpen ? "Скрыть чат" : "Показать чат"}
+            <button type="button" onClick={toggleChat} title={chatOpen ? tr("hideChat", undefined, "tasks") : tr("showChat", undefined, "tasks")}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition shrink-0 ${
-                chatOpen ? "border-teal-500/50 bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-200" : `${t.border} ${t.muted} ${t.hover}`
+                chatOpen ? "tasks-chat-toggle--open" : `${t.border} ${t.muted} ${t.hover}`
               }`}>
               {chatOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
               Чат
               {commentCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-teal-600 text-white text-[10px] leading-none">{commentCount}</span>
+                <span className="tasks-count-badge px-1.5 py-0.5 rounded-full text-[10px] leading-none">{commentCount}</span>
               )}
             </button>
           )}
@@ -712,7 +718,7 @@ function TaskWorkspace({ t, task, leads, lead, members, user, onBack, onPatch, o
                   document.body.style.cursor = "col-resize";
                   document.body.style.userSelect = "none";
                 }}
-                className={`cursor-col-resize flex items-center justify-center hover:bg-teal-500/20 active:bg-teal-500/30 ${t.border} border-l border-r`}
+                className={`tasks-resize-handle cursor-col-resize flex items-center justify-center ${isNeoTheme(theme) ? "" : "hover:bg-teal-500/20 active:bg-teal-500/30"} ${t.border} border-l border-r`}
               >
                 <GripVertical className={`w-3 h-3 ${t.muted} opacity-50 pointer-events-none`} />
               </div>
@@ -749,18 +755,18 @@ function TaskWorkspace({ t, task, leads, lead, members, user, onBack, onPatch, o
           <div className={`shrink-0 grid grid-cols-2 border-t ${t.border} ${t.surface}`}>
             <button type="button" onClick={() => setMobileTab("details")}
               className={`py-3 text-sm font-medium transition border-b-2 ${
-                mobileTab === "details" ? "border-teal-600 text-teal-600" : `border-transparent ${t.muted}`
+                mobileTab === "details" ? "tasks-mobile-tab--active" : `border-transparent ${t.muted}`
               }`}>
               Детали
             </button>
             <button type="button" onClick={() => setMobileTab("chat")}
               className={`py-3 text-sm font-medium transition border-b-2 flex items-center justify-center gap-1.5 ${
-                mobileTab === "chat" ? "border-teal-600 text-teal-600" : `border-transparent ${t.muted}`
+                mobileTab === "chat" ? "tasks-mobile-tab--active" : `border-transparent ${t.muted}`
               }`}>
               <MessageSquare className="w-4 h-4" />
               Чат
               {commentCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-teal-600 text-white text-[10px] leading-none">{commentCount}</span>
+                <span className="tasks-count-badge px-1.5 py-0.5 rounded-full text-[10px] leading-none">{commentCount}</span>
               )}
             </button>
           </div>
@@ -771,16 +777,18 @@ function TaskWorkspace({ t, task, leads, lead, members, user, onBack, onPatch, o
 }
 
 function TaskStatusPills({ task, onPatch }: { task: Task; onPatch: (body: Partial<Task>) => Promise<Task> }) {
-  const statuses = (Object.keys(STATUS_LABELS) as TaskStatus[]).filter((s) => s !== "completed" || task.status === "completed");
+  const { theme } = useTheme();
+  const { statusMap } = useTaskLabels();
+  const statuses = (Object.keys(statusMap) as TaskStatus[]).filter((s) => s !== "completed" || task.status === "completed");
   const visible = task.status === "completed" ? (["completed"] as TaskStatus[]) : statuses.filter((s) => s !== "completed");
   return (
     <div className="flex flex-wrap gap-1 shrink-0">
       {visible.map((s) => (
         <button key={s} type="button"
           onClick={() => void onPatch({ status: s, done: s === "completed" })}
-          className="px-2.5 py-1 rounded-full text-xs transition"
-          style={taskStatusPillStyle(s, task.status === s)}>
-          {STATUS_LABELS[s]}
+          className="task-status-pill px-2.5 py-1 rounded-full text-xs transition"
+          style={taskStatusPillStyle(s, task.status === s, theme.colorMode, theme.uiSkin)}>
+          {statusMap[s]}
         </button>
       ))}
     </div>
@@ -800,6 +808,9 @@ function TaskSidebar({ t, task, leads, lead, members, user, onPatch, onDelete, o
   chatOpen?: boolean;
   showStatusPills?: boolean;
 }) {
+  const { theme } = useTheme();
+  const { tr } = useUiT();
+  const { priorityMap } = useTaskLabels();
   const [summaryDraft, setSummaryDraft] = useState(task.statusSummary || "");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -816,7 +827,7 @@ function TaskSidebar({ t, task, leads, lead, members, user, onPatch, onDelete, o
 
   async function complete() {
     if (task.requireSummary && !summaryDraft.trim() && !task.statusSummary) {
-      setErr("Добавьте результат перед завершением");
+      setErr(tr("addResultBeforeComplete", undefined, "tasks"));
       return;
     }
     await save({ status: "completed", done: true, statusSummary: summaryDraft.trim() || task.statusSummary });
@@ -860,7 +871,7 @@ function TaskSidebar({ t, task, leads, lead, members, user, onPatch, onDelete, o
       <div className="grid lg:grid-cols-2 gap-4 lg:items-stretch">
         {/* Левый модуль: люди, сроки, уведомления */}
         <div className={`rounded-xl border p-3 space-y-3 h-full ${t.border} ${t.surface}`}>
-          <h4 className="text-sm font-semibold flex items-center gap-2"><Users className="w-4 h-4 text-teal-600" /> Участники</h4>
+          <h4 className="text-sm font-semibold flex items-center gap-2"><Users className={`w-4 h-4 ${neoIconAccent(theme)}`} /> Участники</h4>
 
           <label className="block">
             <span className={`text-[10px] font-medium uppercase tracking-wide ${t.muted}`}>Постановщик</span>
@@ -919,17 +930,17 @@ function TaskSidebar({ t, task, leads, lead, members, user, onPatch, onDelete, o
           />
 
           <div className={`pt-2 border-t ${t.border} space-y-2`}>
-            <h5 className="text-xs font-semibold flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-teal-600" /> Сроки</h5>
+            <h5 className="text-xs font-semibold flex items-center gap-1.5"><Calendar className={`w-3.5 h-3.5 ${neoIconAccent(theme)}`} /> Сроки</h5>
             <div className="flex flex-wrap gap-2">
-              <MetaChip icon={Flag} label={PRIORITY_LABELS[task.priority]} className={PRIORITY_COLOR[task.priority]}>
+              <MetaChip icon={Flag} label={priorityMap[task.priority]} className={PRIORITY_COLOR[task.priority]}>
                 <select value={task.priority} onChange={(e) => void save({ priority: e.target.value as TaskPriority })}
                   className="bg-transparent border-0 outline-none text-xs cursor-pointer">
-                  {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((p) => (
-                    <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
+                  {(Object.keys(priorityMap) as TaskPriority[]).map((p) => (
+                    <option key={p} value={p}>{priorityMap[p]}</option>
                   ))}
                 </select>
               </MetaChip>
-              <MetaChip icon={Calendar} label="Срок">
+              <MetaChip icon={Calendar} label={tr("dueDate", undefined, "tasks")}>
                 <GlassDateTimePicker
                   inline
                   value={task.dueAt ? task.dueAt.slice(0, 16) : ""}
@@ -945,14 +956,14 @@ function TaskSidebar({ t, task, leads, lead, members, user, onPatch, onDelete, o
             <label className="flex items-center gap-2 text-xs">
               <input type="checkbox" checked={task.notifyParticipants !== false}
                 onChange={(e) => void save({ notifyParticipants: e.target.checked })} className="accent-teal-600" />
-              <Bell className="w-3.5 h-3.5 text-teal-600" /> Уведомлять участников
+              <Bell className={`w-3.5 h-3.5 ${neoIconAccent(theme)}`} /> Уведомлять участников
             </label>
           </div>
         </div>
 
         {/* Правый модуль: описание, теги, сделка */}
         <div className={`rounded-xl border p-3 flex flex-col gap-3 h-full min-h-0 ${t.border} ${t.surface}`}>
-          <h4 className="text-sm font-semibold flex items-center gap-2 shrink-0"><MessageSquare className="w-4 h-4 text-teal-600" /> Содержание</h4>
+          <h4 className="text-sm font-semibold flex items-center gap-2 shrink-0"><MessageSquare className={`w-4 h-4 ${neoIconAccent(theme)}`} /> Содержание</h4>
 
           <label className="flex flex-col flex-1 min-h-0 gap-1">
             <span className={`text-[10px] font-medium uppercase tracking-wide ${t.muted}`}>Описание</span>
@@ -973,7 +984,7 @@ function TaskSidebar({ t, task, leads, lead, members, user, onPatch, onDelete, o
               </select>
               {lead && (
                 <button type="button" onClick={() => onOpenLead(lead.id)}
-                  className="mt-2 text-xs text-teal-600 hover:underline">Открыть карточку →</button>
+                  className={`mt-2 text-xs ${neoIconAccent(theme)} hover:underline`}>Открыть карточку →</button>
               )}
             </label>
           </div>
@@ -984,15 +995,15 @@ function TaskSidebar({ t, task, leads, lead, members, user, onPatch, onDelete, o
       <CollapsibleSection t={t} title={`Чек-лист${progress ? ` (${progress.done}/${progress.total})` : ""}`} icon={Check}
         defaultOpen={task.checklist.length > 0}>
         {progress && (
-          <div className="mb-2 h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
-            <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${progress.pct}%` }} />
+          <div className="task-progress-track mb-2 h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+            <div className="task-progress-fill h-full bg-teal-500 rounded-full transition-all" style={{ width: `${progress.pct}%` }} />
           </div>
         )}
         <div className="space-y-1">
           {task.checklist.map((item) => (
             <label key={item.id} className={`flex items-center gap-2 text-sm px-1 py-1 rounded-lg ${t.hover}`}>
               <button type="button" onClick={() => toggleChecklistItem(item.id)}
-                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${item.done ? "bg-teal-600 border-teal-600 text-white" : t.border}`}>
+                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${skinCheckDone(theme, item.done, t)}`}>
                 {item.done && <Check className="w-2.5 h-2.5" />}
               </button>
               <span className={`text-xs ${item.done ? "line-through opacity-60" : ""}`}>{item.text}</span>
@@ -1004,10 +1015,12 @@ function TaskSidebar({ t, task, leads, lead, members, user, onPatch, onDelete, o
 
       <TaskFilesPanel t={t} files={task.files || []} onChange={(files) => void save({ files })} />
 
+      <EdoTaskDocuments task={task} user={user} t={t} />
+
       <CollapsibleSection t={t} title="Результат" icon={Pin} defaultOpen={!!task.pinnedResult || task.requireSummary}
         highlight={task.requireSummary}>
         {task.pinnedResult ? (
-          <div className="rounded-lg border border-teal-400/40 bg-teal-50/50 dark:bg-teal-500/10 p-2.5 text-xs">
+          <div className={`tasks-highlight-box rounded-lg border border-teal-400/40 bg-teal-50/50 dark:bg-teal-500/10 p-2.5 text-xs`}>
             <p className="whitespace-pre-wrap crm-data">{task.pinnedResult.text}</p>
             <p className={`${t.muted} mt-1`}>Согласовано: {task.pinnedResult.agreedByName}</p>
           </div>
@@ -1103,8 +1116,8 @@ function TaskFilesPanel({ t, files, onChange }: {
       <ul className="mt-2 space-y-1">
         {files.map((f) => (
           <li key={f.id} className={`flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded-lg ${t.soft}`}>
-            {f.dataUrl ? (
-              <a href={f.dataUrl} download={f.name} className="truncate text-teal-600 hover:underline">{f.name}</a>
+            {(f.downloadUrl || f.dataUrl) ? (
+              <a href={f.downloadUrl || f.dataUrl} download={f.name} target={f.downloadUrl ? "_blank" : undefined} rel={f.downloadUrl ? "noopener noreferrer" : undefined} className="truncate text-teal-600 hover:underline">{f.name}</a>
             ) : (
               <span className="truncate">{f.name}</span>
             )}
@@ -1162,6 +1175,7 @@ function TaskChat({ t, task, user, onRefresh, onClose }: {
   onRefresh: (task: Task) => void;
   onClose?: () => void;
 }) {
+  const { theme } = useTheme();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pinningId, setPinningId] = useState<string | null>(null);
@@ -1169,7 +1183,8 @@ function TaskChat({ t, task, user, onRefresh, onClose }: {
   const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
   const bottomRef = useRef<HTMLDivElement>(null);
   const isWatcher = (task.watchers || []).includes(user.id);
-  const feed = useMemo(() => buildActivityFeed(task), [task]);
+  const { tr } = useUiT();
+  const feed = useMemo(() => buildActivityFeed(task, tr), [task, tr]);
 
   const visible = useMemo(() => {
     if (chatFilter === "comments") return feed.filter((x) => x.kind === "comment");
@@ -1216,7 +1231,7 @@ function TaskChat({ t, task, user, onRefresh, onClose }: {
       <div className={`px-3 sm:px-4 py-2.5 sm:py-3 border-b ${t.border} shrink-0`}>
         <div className="flex items-center justify-between gap-2">
           <h3 className={`text-sm font-semibold flex items-center gap-2 ${t.text}`}>
-            <MessageSquare className="w-4 h-4 text-teal-600" /> Чат
+            <MessageSquare className={`w-4 h-4 ${neoIconAccent(theme)}`} /> Чат
           </h3>
           <div className="flex items-center gap-1.5">
             <div className={`flex gap-0.5 rounded-lg p-0.5 ${t.chip}`}>
@@ -1240,8 +1255,8 @@ function TaskChat({ t, task, user, onRefresh, onClose }: {
       </div>
 
       {task.pinnedResult && chatFilter !== "history" && (
-        <div className="mx-3 mt-3 p-3 rounded-xl border-2 border-teal-400/60 bg-teal-50/90 dark:bg-teal-500/10 shrink-0">
-          <div className="text-xs font-semibold text-teal-800 dark:text-teal-200 flex items-center gap-1.5 mb-1">
+        <div className="tasks-highlight-box mx-3 mt-3 p-3 rounded-xl border-2 border-teal-400/60 bg-teal-50/90 dark:bg-teal-500/10 shrink-0">
+          <div className={`text-xs font-semibold flex items-center gap-1.5 mb-1 ${isNeoTheme(theme) ? neoIconAccent(theme) : "text-teal-800 dark:text-teal-200"}`}>
             <Pin className="w-3.5 h-3.5" /> Согласованный результат
           </div>
           <p className={`text-sm whitespace-pre-wrap crm-data ${t.text}`}>{task.pinnedResult.text}</p>
@@ -1264,20 +1279,20 @@ function TaskChat({ t, task, user, onRefresh, onClose }: {
             return (
               <div key={item.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                  pinned ? "border-2 border-teal-400/60 bg-teal-50 dark:bg-teal-500/10"
-                    : mine ? "bg-teal-600 text-white rounded-br-md" : `${t.surface} border ${t.border} rounded-bl-md`
+                  pinned ? "tasks-chat-bubble--pinned border-2 border-teal-400/60"
+                    : mine ? "tasks-chat-bubble--mine rounded-br-md" : `${t.surface} border ${t.border} rounded-bl-md`
                 }`}>
                   {!mine && <div className="text-[10px] font-medium opacity-70 mb-0.5">{c.author}</div>}
                   <p className="whitespace-pre-wrap crm-data">{c.text}</p>
-                  <div className={`flex items-center justify-between gap-2 mt-1 ${mine && !pinned ? "text-white/70" : t.muted}`}>
+                  <div className={`flex items-center justify-between gap-2 mt-1 ${mine && !pinned ? (isNeoTheme(theme) ? t.muted : "text-white/70") : t.muted}`}>
                     <span className="text-[10px]">{formatShortTime(c.createdAt)}</span>
                     {isWatcher && !pinned && (
                       <button type="button" disabled={pinningId === c.id} onClick={() => void pinAsResult(c)}
-                        className={`text-[10px] flex items-center gap-0.5 hover:underline disabled:opacity-50 ${mine ? "text-white/90" : "text-teal-600"}`}>
+                        className={`text-[10px] flex items-center gap-0.5 hover:underline disabled:opacity-50 ${mine && !isNeoTheme(theme) ? "text-white/90" : neoIconAccent(theme)}`}>
                         <Pin className="w-2.5 h-2.5" /> Результат
                       </button>
                     )}
-                    {pinned && <span className="text-[10px] flex items-center gap-0.5 text-teal-600"><Pin className="w-2.5 h-2.5" /> Закреплено</span>}
+                    {pinned && <span className={`text-[10px] flex items-center gap-0.5 ${neoIconAccent(theme)}`}><Pin className="w-2.5 h-2.5" /> Закреплено</span>}
                   </div>
                 </div>
               </div>
@@ -1347,6 +1362,7 @@ function CreateTaskModal({ t, leads, members, user, saving, onClose, onCreate, d
   onCreate: (body: Partial<Task> & { text: string }) => Promise<void>;
   defaultLeadId?: string;
 }) {
+  const { priorityMap } = useTaskLabels();
   const [text, setText] = useState("");
   const [description, setDescription] = useState("");
   const [leadId, setLeadId] = useState(defaultLeadId || "");
@@ -1484,8 +1500,8 @@ function CreateTaskModal({ t, leads, members, user, saving, onClose, onCreate, d
                 <span className={`text-xs font-medium ${t.muted}`}>Приоритет</span>
                 <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)}
                   className={`w-full mt-1 rounded-lg border px-3 py-2 text-sm ${t.input}`}>
-                  {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((p) => (
-                    <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
+                  {(Object.keys(priorityMap) as TaskPriority[]).map((p) => (
+                    <option key={p} value={p}>{priorityMap[p]}</option>
                   ))}
                 </select>
               </label>
@@ -1509,21 +1525,23 @@ function CreateTaskModal({ t, leads, members, user, saving, onClose, onCreate, d
 }
 
 /** Компактный блок задач в карточке сделки */
-export function LeadTasksBlock({ t, leadId, tasks, realtors, user, updateData, allTasks, leads, onOpenTask }: {
+export function LeadTasksBlock({ t, leadId, tasks, dealManagers, user, updateData, allTasks, leads, onOpenTask }: {
   t: Record<string, string>;
   leadId: string;
   tasks: Task[];
   allTasks: Task[];
-  realtors: Realtor[];
+  dealManagers: DealManager[];
   leads: Lead[];
   user: AuthUser;
   updateData: (patch: Partial<CrmData>) => void;
   onOpenTask?: (taskId: string) => void;
 }) {
+  const { theme } = useTheme();
+  const { statusMap } = useTaskLabels();
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
-  const members = useMemo(() => teamUsers(realtors, user), [realtors, user]);
+  const members = useMemo(() => teamUsers(dealManagers, user), [dealManagers, user]);
   const leadTasks = tasks.filter((x) => x.leadId === leadId).map(normalizeTask);
 
   async function createTask(body: Partial<Task> & { text: string }) {
@@ -1588,16 +1606,16 @@ export function LeadTasksBlock({ t, leadId, tasks, realtors, user, updateData, a
             <div className="flex-1 min-w-0">
               <div className={`font-medium truncate crm-data ${task.done ? "line-through" : ""}`}>{task.text}</div>
               {task.dueAt && (
-                <div className={`text-[10px] mt-0.5 ${isOverdue(task) ? "text-rose-600" : t.muted}`}>
+                <div className={`text-[10px] mt-0.5 ${isOverdue(task) ? "text-rose-600 dark:text-rose-400" : t.muted}`}>
                   <Clock className="w-3 h-3 inline" /> {formatDue(task.dueAt)}
                 </div>
               )}
             </div>
             <span
-              className="text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0"
-              style={taskStatusBadgeStyle(task.status)}
+              className="task-status-badge text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0"
+              style={taskStatusBadgeStyle(task.status, theme.colorMode, theme.uiSkin)}
             >
-              {STATUS_LABELS[task.status]}
+              {statusMap[task.status]}
             </span>
           </div>
         ))}

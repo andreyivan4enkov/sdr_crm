@@ -70,7 +70,7 @@ async function deliver(userIds: string[], input: NotifyInput) {
 
   if (pushUsers.length) {
     const payload: PushPayload = {
-      title: "SDR CRM",
+      title: "CRM",
       body: input.text,
       url,
       tag: input.taskId || input.callId || input.leadId || input.kind,

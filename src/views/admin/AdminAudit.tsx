@@ -53,7 +53,7 @@ export function AdminAudit({ t }: { t: Record<string, string> }) {
                   <div className="flex justify-between gap-2 items-center">
                     <span className="font-medium flex items-center gap-2">
                       {l.action}
-                      {(l.meta as Record<string, unknown> | undefined)?.anomaly === true && (
+                      {((l as unknown as Record<string, unknown>).meta as Record<string, unknown> | undefined)?.anomaly === true && (
                         <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300">
                           anomaly
                         </span>

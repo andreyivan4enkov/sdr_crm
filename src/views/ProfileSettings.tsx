@@ -56,7 +56,7 @@ export function ProfileSettings({ t, Btn, TInput, Labeled }: {
     if (!f.phone.trim()) return setErr("Укажите телефон");
     if (!f.position.trim()) return setErr("Укажите должность");
     if (!f.email.trim()) return setErr("Укажите email");
-    if (account?.isRealtor && !f.region.trim()) return setErr("Укажите регион работы");
+    if (account?.isDealManager && !f.region.trim()) return setErr("Укажите регион работы");
 
     setBusy(true);
     try {
@@ -148,12 +148,12 @@ export function ProfileSettings({ t, Btn, TInput, Labeled }: {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">Работа</h3>
           <div className="space-y-3">
             <Labeled label="Должность" t={t}>
-              <TInput t={t} value={f.position} onChange={(v) => setF({ ...f, position: v })} placeholder="Риэлтор, оператор…" />
+              <TInput t={t} value={f.position} onChange={(v) => setF({ ...f, position: v })} placeholder="Менеджер по сделкам, оператор…" />
             </Labeled>
             <Labeled label="Email" t={t}>
               <TInput t={t} type="email" value={f.email} onChange={(v) => setF({ ...f, email: v })} placeholder="name@company.ru" />
             </Labeled>
-            {(account?.isRealtor || f.region) && (
+            {(account?.isDealManager || f.region) && (
               <Labeled label="Регион работы" t={t}>
                 <TInput t={t} value={f.region} onChange={(v) => setF({ ...f, region: v })} placeholder="Москва, СПб…" />
               </Labeled>

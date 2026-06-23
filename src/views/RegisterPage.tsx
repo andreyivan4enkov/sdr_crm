@@ -27,7 +27,7 @@ export function RegisterPage({ t, Btn, TInput, Labeled }: {
   const fileRef = useRef<HTMLInputElement>(null);
   const [valid, setValid] = useState<boolean | null>(null);
   const [role, setRole] = useState("");
-  const [isRealtor, setIsRealtor] = useState(false);
+  const [isDealManager, setIsDealManager] = useState(false);
   const [f, setF] = useState<FormState>({
     name: "", phone: "", position: "", email: "", region: "", login: "", password: "", avatar: null,
   });
@@ -40,7 +40,7 @@ export function RegisterPage({ t, Btn, TInput, Labeled }: {
     api.verifyInvite(token).then((r) => {
       setValid(r.valid);
       if (r.role) setRole(r.role);
-      setIsRealtor(Boolean(r.isRealtor));
+      setIsDealManager(Boolean(r.isDealManager));
     }).catch(() => setValid(false));
   }, [token]);
 
@@ -68,7 +68,7 @@ export function RegisterPage({ t, Btn, TInput, Labeled }: {
     if (!f.phone.trim()) return setErr("Укажите телефон");
     if (!f.position.trim()) return setErr("Укажите должность");
     if (!f.email.trim()) return setErr("Укажите email");
-    if (isRealtor && !f.region.trim()) return setErr("Укажите регион работы");
+    if (isDealManager && !f.region.trim()) return setErr("Укажите регион работы");
     if (!f.login.trim()) return setErr("Придумайте логин");
     if (!f.password.trim()) return setErr("Придумайте пароль");
 
@@ -176,12 +176,12 @@ export function RegisterPage({ t, Btn, TInput, Labeled }: {
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">Работа</h3>
             <div className="space-y-3">
               <Labeled label="Должность" t={t}>
-                <TInput t={t} value={f.position} onChange={(v) => setF({ ...f, position: v })} placeholder="Риэлтор, оператор…" />
+                <TInput t={t} value={f.position} onChange={(v) => setF({ ...f, position: v })} placeholder="Менеджер по сделкам, оператор…" />
               </Labeled>
               <Labeled label="Email" t={t}>
                 <TInput t={t} type="email" value={f.email} onChange={(v) => setF({ ...f, email: v })} placeholder="name@company.ru" />
               </Labeled>
-              {isRealtor && (
+              {isDealManager && (
                 <Labeled label="Регион работы" t={t}>
                   <TInput t={t} value={f.region} onChange={(v) => setF({ ...f, region: v })} placeholder="Москва, СПб…" />
                 </Labeled>

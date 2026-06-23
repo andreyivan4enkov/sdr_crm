@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * SDR CRM — стресс-бенчмарк: Classic (production patterns) vs SDR methods.
+ * CRM — стресс-бенчмарк: Classic (production patterns) vs Bench methods.
  * Фазы: WARMUP → LOAD → STRESS → SOAK (отраслевой протокол).
  * Лог: tests/crm_comparison/logs/stress-report.log
  */
@@ -64,7 +64,7 @@ type LatencyStats = {
 };
 
 type StackResult = {
-  stack: "CLASSIC" | "SDR";
+  stack: "CLASSIC" | "BENCH";
   phase: string;
   stats: LatencyStats;
   searchHits: number;
@@ -73,7 +73,7 @@ type StackResult = {
   auditFp: number;
 };
 
-// ─── SDR core: @sdr-crm/sdr-core ───────────────────────────────────────────
+// ─── BENCH core: @sdr-crm/sdr-core ───────────────────────────────────────────
 const FEATURES = [
   "high_income", "repeat_visit", "complaint", "night_activity", "channel_paid", "region_moscow",
   "fast_response", "long_comment", "referral", "mobile_user", "email_open", "call_answered",
@@ -104,11 +104,11 @@ function genEvents(n: number, insider = false): SessionEvent[] {
 function surprisal(ev: SessionEvent, m: ReturnType<typeof buildEventModel>) {
   return eventSurprisalBits(ev, m);
 }
-type SqlRow = { leadId: string; stage: string; pipeline: string; channel: string; realtor: string; orgUnit: string };
+type SqlRow = { leadId: string; stage: string; pipeline: string; channel: string; dealManager: string; orgUnit: string };
 function buildGraph(n: number): SqlRow[] {
   return Array.from({ length: n }, (_, i) => ({
     leadId: `lead-${i}`, stage: `stage-${i % 20}`, pipeline: `pipe-${i % 5}`,
-    channel: `ch-${i % 8}`, realtor: `realtor-${i % 50}`, orgUnit: `org-${i % 10}`,
+    channel: `ch-${i % 8}`, dealManager: `dealManager-${i % 50}`, orgUnit: `org-${i % 10}`,
   }));
 }
 function sqlFiveHop(rows: SqlRow[], leadId: string) {
@@ -116,7 +116,7 @@ function sqlFiveHop(rows: SqlRow[], leadId: string) {
   const lead = hop("leadId", leadId); if (!lead) return undefined;
   const s1 = hop("stage", lead.stage), s2 = s1 ? hop("pipeline", s1.pipeline) : undefined;
   const s3 = s2 ? hop("channel", s2.channel) : undefined;
-  const s4 = s3 ? hop("realtor", s3.realtor) : undefined;
+  const s4 = s3 ? hop("deal_manager", s3.dealManager) : undefined;
   return s4 ? hop("orgUnit", s4.orgUnit) : undefined;
 }
 
@@ -203,7 +203,7 @@ class ClassicCrmStack {
   }
 }
 
-// ─── SDR CRM (SDM + VaCoAl + FPTM + Surprisal) ─────────────────────────────
+// ─── CRM (SDM + VaCoAl + FPTM + Surprisal) ─────────────────────────────
 class SdrCrmStack {
   private sdm!: SparseDistributedMemory;
   private order: string[] = [];
@@ -304,7 +304,7 @@ function percentile(sorted: number[], p: number): number {
 }
 
 function runStackPhase(
-  stack: "CLASSIC" | "SDR",
+  stack: "CLASSIC" | "BENCH",
   phase: string,
   workload: Op[],
   classic: ClassicCrmStack,
@@ -368,21 +368,21 @@ function w(text: string) {
   console.log(text.replace(/\*\*/g, ""));
 }
 
-type AxisScore = { axis: string; classic: number; sdr: number; weight: number; winner: "CLASSIC" | "SDR" | "TIE" };
+type AxisScore = { axis: string; classic: number; sdr: number; weight: number; winner: "CLASSIC" | "BENCH" | "TIE" };
 
 function objectiveCompare(all: StackResult[]): void {
   const classicLoad = all.find((r) => r.stack === "CLASSIC" && r.phase === "LOAD")!;
-  const sdrLoad = all.find((r) => r.stack === "SDR" && r.phase === "LOAD")!;
+  const sdrLoad = all.find((r) => r.stack === "BENCH" && r.phase === "LOAD")!;
   const classicStress = all.find((r) => r.stack === "CLASSIC" && r.phase === "STRESS")!;
-  const sdrStress = all.find((r) => r.stack === "SDR" && r.phase === "STRESS")!;
+  const sdrStress = all.find((r) => r.stack === "BENCH" && r.phase === "STRESS")!;
   const classicSoak = all.find((r) => r.stack === "CLASSIC" && r.phase === "SOAK")!;
-  const sdrSoak = all.find((r) => r.stack === "SDR" && r.phase === "SOAK")!;
+  const sdrSoak = all.find((r) => r.stack === "BENCH" && r.phase === "SOAK")!;
 
   const searchClassic = all.filter((r) => r.stack === "CLASSIC").reduce((s, r) => s + r.searchHits, 0);
-  const searchSdr = all.filter((r) => r.stack === "SDR").reduce((s, r) => s + r.searchHits, 0);
+  const searchSdr = all.filter((r) => r.stack === "BENCH").reduce((s, r) => s + r.searchHits, 0);
   const tries = all.filter((r) => r.stack === "CLASSIC").reduce((s, r) => s + r.searchTries, 0);
-  const fpSdr = all.filter((r) => r.stack === "SDR").reduce((s, r) => s + r.auditFp, 0);
-  const detSdr = all.filter((r) => r.stack === "SDR").reduce((s, r) => s + r.auditDetected, 0);
+  const fpSdr = all.filter((r) => r.stack === "BENCH").reduce((s, r) => s + r.auditFp, 0);
+  const detSdr = all.filter((r) => r.stack === "BENCH").reduce((s, r) => s + r.auditDetected, 0);
 
   const recallClassic = (searchClassic / tries) * 100;
   const recallSdr = (searchSdr / tries) * 100;
@@ -390,22 +390,22 @@ function objectiveCompare(all: StackResult[]): void {
 
   const axes: AxisScore[] = [
     { axis: "p95 latency LOAD (ms)", classic: classicLoad.stats.p95, sdr: sdrLoad.stats.p95, weight: 20,
-      winner: classicLoad.stats.p95 < sdrLoad.stats.p95 ? "CLASSIC" : sdrLoad.stats.p95 < classicLoad.stats.p95 ? "SDR" : "TIE" },
+      winner: classicLoad.stats.p95 < sdrLoad.stats.p95 ? "CLASSIC" : sdrLoad.stats.p95 < classicLoad.stats.p95 ? "BENCH" : "TIE" },
     { axis: "p95 latency STRESS (ms)", classic: classicStress.stats.p95, sdr: sdrStress.stats.p95, weight: 25,
-      winner: classicStress.stats.p95 < sdrStress.stats.p95 ? "CLASSIC" : sdrStress.stats.p95 < classicStress.stats.p95 ? "SDR" : "TIE" },
+      winner: classicStress.stats.p95 < sdrStress.stats.p95 ? "CLASSIC" : sdrStress.stats.p95 < classicStress.stats.p95 ? "BENCH" : "TIE" },
     { axis: "throughput LOAD (ops/s)", classic: classicLoad.stats.throughput, sdr: sdrLoad.stats.throughput, weight: 15,
-      winner: classicLoad.stats.throughput > sdrLoad.stats.throughput ? "CLASSIC" : sdrLoad.stats.throughput > classicLoad.stats.throughput ? "SDR" : "TIE" },
+      winner: classicLoad.stats.throughput > sdrLoad.stats.throughput ? "CLASSIC" : sdrLoad.stats.throughput > classicLoad.stats.throughput ? "BENCH" : "TIE" },
     { axis: "fuzzy search recall %", classic: recallClassic, sdr: recallSdr, weight: 20,
-      winner: recallSdr > recallClassic ? "SDR" : recallClassic > recallSdr ? "CLASSIC" : "TIE" },
+      winner: recallSdr > recallClassic ? "BENCH" : recallClassic > recallSdr ? "CLASSIC" : "TIE" },
     { axis: "error rate STRESS %", classic: (classicStress.stats.errors / classicStress.stats.ops) * 100, sdr: (sdrStress.stats.errors / sdrStress.stats.ops) * 100, weight: 10,
-      winner: classicStress.stats.errors < sdrStress.stats.errors ? "CLASSIC" : sdrStress.stats.errors < classicStress.stats.errors ? "SDR" : "TIE" },
+      winner: classicStress.stats.errors < sdrStress.stats.errors ? "CLASSIC" : sdrStress.stats.errors < classicStress.stats.errors ? "BENCH" : "TIE" },
     { axis: "soak RSS growth %", classic: ((classicSoak.stats.rssEndMb - classicSoak.stats.rssStartMb) / classicSoak.stats.rssStartMb) * 100, sdr: ((sdrSoak.stats.rssEndMb - sdrSoak.stats.rssStartMb) / sdrSoak.stats.rssStartMb) * 100, weight: 10,
-      winner: classicSoak.stats.rssEndMb < sdrSoak.stats.rssEndMb ? "CLASSIC" : sdrSoak.stats.rssEndMb < classicSoak.stats.rssEndMb ? "SDR" : "TIE" },
+      winner: classicSoak.stats.rssEndMb < sdrSoak.stats.rssEndMb ? "CLASSIC" : sdrSoak.stats.rssEndMb < classicSoak.stats.rssEndMb ? "BENCH" : "TIE" },
   ];
 
   let classicPts = 0, sdrPts = 0;
   w("\n## Объективная scorecard (взвешенная)");
-  w("| Ось | Classic | SDR | Вес | Победитель | SLA |");
+  w("| Ось | Classic | Bench | Вес | Победитель | SLA |");
   w("|-----|---------|-----|-----|------------|-----|");
   for (const a of axes) {
     const slaOk = a.axis.includes("recall") ? a.sdr >= SLA.fuzzyRecallMinPct || a.classic >= SLA.fuzzyRecallMinPct
@@ -414,29 +414,29 @@ function objectiveCompare(all: StackResult[]): void {
       : true;
     w(`| ${a.axis} | ${a.classic.toFixed(2)} | ${a.sdr.toFixed(2)} | ${a.weight}% | ${a.winner} | ${slaOk ? "OK" : "—"} |`);
     if (a.winner === "CLASSIC") classicPts += a.weight;
-    else if (a.winner === "SDR") sdrPts += a.weight;
+    else if (a.winner === "BENCH") sdrPts += a.weight;
     else { classicPts += a.weight / 2; sdrPts += a.weight / 2; }
   }
 
-  w(`\n### Итоговые баллы: Classic **${classicPts.toFixed(0)}** / SDR **${sdrPts.toFixed(0)}** (из 100)`);
+  w(`\n### Итоговые баллы: Classic **${classicPts.toFixed(0)}** / BENCH **${sdrPts.toFixed(0)}** (из 100)`);
   w(`\n### Качество под нагрузкой`);
-  w(`- Fuzzy recall: Classic ${recallClassic.toFixed(1)}% vs SDR ${recallSdr.toFixed(1)}% (SLA ≥${SLA.fuzzyRecallMinPct}%)`);
-  w(`- Insider detect (SDR surprisal): ${detSdr} events, FP ${fpPct.toFixed(2)}% (SLA ≤${SLA.insiderFpMaxPct}%)`);
+  w(`- Fuzzy recall: Classic ${recallClassic.toFixed(1)}% vs Bench ${recallSdr.toFixed(1)}% (SLA ≥${SLA.fuzzyRecallMinPct}%)`);
+  w(`- Insider detect (BENCH surprisal): ${detSdr} events, FP ${fpPct.toFixed(2)}% (SLA ≤${SLA.insiderFpMaxPct}%)`);
   w(`- Classic RBAC: 0 insider detections (ожидаемо)`);
 
-  const overall = sdrPts > classicPts + 5 ? "SDR" : classicPts > sdrPts + 5 ? "CLASSIC" : "HYBRID";
+  const overall = sdrPts > classicPts + 5 ? "BENCH" : classicPts > sdrPts + 5 ? "CLASSIC" : "HYBRID";
   w(`\n### Вердикт: **${overall}**`);
-  if (overall === "HYBRID" || overall === "SDR") {
-    w("SDR: fuzzy search 100%, insider detect, graph; Classic: list/graph latency, throughput.");
-    w("Рекомендация: **гибрид** — Classic CRUD (`server/`) + SDR для поиска, графа, audit surprisal.");
+  if (overall === "HYBRID" || overall === "BENCH") {
+    w("BENCH: fuzzy search 100%, insider detect, graph; Classic: list/graph latency, throughput.");
+    w("Рекомендация: **гибрид** — Classic CRUD (`server/`) + BENCH для поиска, графа, audit surprisal.");
   } else {
-    w("Classic быстрее на list/pagination и throughput; SDR выигрывает на fuzzy recall и security.");
-    w("Рекомендация: внедрить SDR-слой для поиска и `audit_log` anomaly, оставить Drizzle для CRUD.");
+    w("Classic быстрее на list/pagination и throughput; BENCH выигрывает на fuzzy recall и security.");
+    w("Рекомендация: внедрить слой поиска для поиска и `audit_log` anomaly, оставить Drizzle для CRUD.");
   }
 
   w("\n### Production gap");
   w("- Classic: `server/` Hono + Drizzle + PostgreSQL");
-  w("- SDR: `tests/strict_math_refactor/bench-core.ts` (не в API)");
+  w("- BENCH: `tests/strict_math_refactor/bench-core.ts` (не в API)");
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -449,7 +449,7 @@ const meta = {
 
 mkdirSync(join(ROOT, "logs"), { recursive: true });
 writeFileSync(LOG, [
-  "# SDR CRM — Stress Benchmark: Classic vs SDR", "",
+  "# CRM — Stress Benchmark: Classic vs Bench", "",
   `| Поле | Значение |`, `|------|----------|`,
   `| Дата | ${new Date().toISOString()} |`, `| Node | ${meta.node} |`, `| Git | ${meta.git} |`,
   `| CPU | ${meta.cpu} |`, `| RAM | ${meta.ram} |`, `| Лидов | ${BENCH.leadCount} |`, "",
@@ -469,7 +469,7 @@ const classicInitMs = performance.now() - tInit0;
 const tInit1 = performance.now();
 sdr.init(BENCH.leadCount, 42);
 const sdrInitMs = performance.now() - tInit1;
-w(`Init: Classic ${classicInitMs.toFixed(0)} ms | SDR ${sdrInitMs.toFixed(0)} ms`);
+w(`Init: Classic ${classicInitMs.toFixed(0)} ms | BENCH ${sdrInitMs.toFixed(0)} ms`);
 
 const allResults: StackResult[] = [];
 let phaseSeed = 0xb00b5e42;
@@ -480,7 +480,7 @@ for (const phase of BENCH.phases) {
   phaseSeed = (phaseSeed * 1664525 + 1013904223) >>> 0;
 
   const rClassic = runStackPhase("CLASSIC", phase.name, workload, classic, sdr);
-  const rSdr = runStackPhase("SDR", phase.name, workload, classic, sdr);
+  const rSdr = runStackPhase("BENCH", phase.name, workload, classic, sdr);
   allResults.push(rClassic, rSdr);
 
   for (const r of [rClassic, rSdr]) {
@@ -499,8 +499,8 @@ for (const phase of BENCH.phases) {
   }
 
   const p95c = rClassic.stats.p95, p95s = rSdr.stats.p95;
-  const winner = p95c < p95s * 0.9 ? "CLASSIC" : p95s < p95c * 0.9 ? "SDR" : "PARITY";
-  w(`\n**Фаза ${phase.name} p95:** Classic ${p95c.toFixed(2)} ms vs SDR ${p95s.toFixed(2)} ms → ${winner}`);
+  const winner = p95c < p95s * 0.9 ? "CLASSIC" : p95s < p95c * 0.9 ? "BENCH" : "PARITY";
+  w(`\n**Фаза ${phase.name} p95:** Classic ${p95c.toFixed(2)} ms vs Bench ${p95s.toFixed(2)} ms → ${winner}`);
 }
 
 objectiveCompare(allResults);

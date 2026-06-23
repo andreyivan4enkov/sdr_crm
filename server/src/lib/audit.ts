@@ -7,6 +7,8 @@ export type AuditAction =
   | "auth.login"
   | "auth.login_failed"
   | "auth.logout"
+  | "auth.qr_create"
+  | "auth.qr_login"
   | "lead.list"
   | "lead.read"
   | "lead.create"
@@ -15,6 +17,7 @@ export type AuditAction =
   | "lead.erase"
   | "lead.export"
   | "lead.consent_revoke"
+  | "lead.consent_revoke_request"
   | "lead.public_create"
   | "lead.retention_purge"
   | "lead.note"
@@ -35,8 +38,14 @@ export type AuditAction =
   | "employee.update"
   | "employee.delete"
   | "integration.update"
+  | "edo.upload"
+  | "edo.sign"
+  | "edo.send"
+  | "edo.config"
+  | "legal.create"
   | "webhook.tilda"
   | "webhook.marketing"
+  | "webhook.connector"
   | "settings.change";
 
 export async function writeAudit(opts: {

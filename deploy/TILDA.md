@@ -1,12 +1,12 @@
-# Подключение Tilda (example.com) к SDR CRM
+# Подключение Tilda (example.com) к CRM
 
-Сайт [example.com](https://example.com/) на Tilda. Форма заявки содержит поля **Имя**, **Телефон**, **Дата** — в webhook Tilda они приходят как `Name`, `Phone`, `Date` ([документация Tilda](https://help.tilda.cc/forms/webhook)).
+Сайт на Tilda. Форма заявки: **Имя**, **Телефон**, **Дата** — в webhook приходят как `Name`, `Phone`, `Date` ([документация Tilda](https://help.tilda.cc/forms/webhook)).
 
 ## 1. Включите интеграцию в CRM
 
 1. Войдите как **администратор** или **интегратор**
 2. **Настройки → Каналы и интеграции → Tilda**
-3. Маппинг полей (формат `поле_tilda=поле_crm`):
+3. Маппинг полей (`поле_tilda=поле_crm`):
 
 ```
 Name=name
@@ -15,60 +15,48 @@ Date=preferredTime
 pd_consent=pdConsent
 ```
 
-4. Нажмите **Включить**
-5. Скопируйте **Webhook URL** и **Secret**
+4. **Включить** → скопируйте **Webhook URL** и **Secret**
 
-| Поле Tilda | Поле CRM | Куда попадает в карточке |
-|------------|----------|--------------------------|
-| `Name` | `name` | Имя клиента |
+| Поле Tilda | Поле CRM | Карточка |
+|------------|----------|----------|
+| `Name` | `name` | Имя |
 | `Phone` | `phone` | Телефон |
-| `Date` | `preferredTime` | Удобная дата/время |
-| `Email` | `email` | Email (если добавите в форму) |
-| `Comments` | `comment` | Комментарий |
-| `pd_consent` | `pdConsent` | Согласие на обработку ПДн |
+| `Date` | `preferredTime` | Дата/время |
+| `pd_consent` | `pdConsent` | Согласие ПДн |
 
-Дополнительно CRM автоматически пишет в комментарий `formid` и `tranid` из Tilda (для отладки).
+## 2. Согласие ПДн (152-ФЗ)
 
-## 2. Согласие на обработку ПДн (152-ФЗ)
+Чекбокс в форме Tilda, переменная `pd_consent`. CRM принимает: `yes`, `1`, `true`, `on`, `да`.
 
-В форме Tilda добавьте **чекбокс** согласия со ссылкой на политику (`https://crm.example.com/privacy` или страница на example.com).
+## 3. Webhook в Tilda
 
-В настройках поля чекбокса укажите **имя переменной**: `pd_consent`.
-
-CRM принимает значения: `yes`, `1`, `true`, `on`, `да`.
-
-## 3. Настройте webhook в Tilda
-
-1. [Tilda](https://tilda.cc) → ваш проект **example.com**
-2. **Настройки сайта** → **Формы** → **Webhook**
-3. URL (Tilda не поддерживает произвольные заголовки — секрет в query):
+Tilda **не поддерживает произвольные HTTP-заголовки** — секрет передаётся в query:
 
 ```
 https://crm.example.com/api/webhooks/tilda?secret=ВАШ_СЕКРЕТ_ИЗ_CRM
 ```
 
-Пока HTTPS на `crm.example.com` не готов, временно:
+> Webhook Tilda — на **платных** тарифах.
 
-```
-http://161.104.16.243/api/webhooks/tilda?secret=ВАШ_СЕКРЕТ_ИЗ_CRM
-```
+## 4. Проверка (curl)
 
-4. Сохраните
-
-> Webhook Tilda доступен на **платных** тарифах. См. [help.tilda.cc/forms/webhook](https://help.tilda.cc/forms/webhook).
-
-## 4. Проверка
-
-Тест с сервера (подставьте свой secret):
+Ручной тест с заголовком (рекомендуется для отладки):
 
 ```bash
-curl -X POST 'http://161.104.16.243/api/webhooks/tilda?secret=СЕКРЕТ' \
+curl -X POST 'https://crm.example.com/api/webhooks/tilda' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -H 'X-Webhook-Secret: СЕКРЕТ' \
+  -d 'Name=Тест&Phone=%2B79001234567&Date=08-06-2026&formid=form123&tranid=999&pd_consent=yes'
+```
+
+Эмуляция Tilda (секрет в URL, без HMAC):
+
+```bash
+curl -X POST 'https://crm.example.com/api/webhooks/tilda?secret=СЕКРЕТ' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'Name=Тест&Phone=%2B79001234567&Date=08-06-2026&formid=form123&tranid=999&pd_consent=yes'
 ```
 
-В CRM должен появиться лид: источник `tilda`, канал **Tilda**, этап «Новая заявка».
-
 ## 5. Договор с Tilda
 
-Заключите договор поручения на обработку ПДн (или убедитесь, что условия Tilda покрывают передачу в вашу CRM).
+Договор поручения на обработку ПДн или условия Tilda, покрывающие передачу в CRM.

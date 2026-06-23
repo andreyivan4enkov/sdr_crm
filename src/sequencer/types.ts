@@ -32,7 +32,7 @@ export type SequencerItem = {
   var1: SequencerAction;
   var2: SequencerAction;
   target: SequencerAction;
-  /** SDR bit-vector fingerprint for topological gating */
+  /** Bit-vector fingerprint for topological gating */
   sdrBits: Uint8Array;
   sourceKind: "lead" | "task";
   sourceId: string;

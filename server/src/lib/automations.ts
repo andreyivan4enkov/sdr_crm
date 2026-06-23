@@ -3,11 +3,11 @@ import type { StageAutomation } from "../db/schema.js";
 type Lead = {
   id: string;
   name: string;
-  assignedRealtorId?: string | null;
+  assignedDealManagerId?: string | null;
   assignedUserId?: string | null;
   custom?: Record<string, string>;
 };
-type Realtor = { id: string; name: string; userId?: string | null };
+type DealManager = { id: string; name: string; userId?: string | null };
 type Channel = { id: string; name: string };
 type StageRef = { id: string; label: string; pipelineId?: string };
 
@@ -18,13 +18,13 @@ export type AutomationResult = {
   moveToStageId?: string;
   copyTo?: { pipelineId: string; stageId: string };
   assignUserId?: string;
-  assignRealtorId?: string;
+  assignDealManagerId?: string;
   fieldPatches?: Record<string, string>;
 };
 
-function resolveRecipient(val: string | undefined, lead: Lead, realtors: Realtor[]) {
+function resolveRecipient(val: string | undefined, lead: Lead, dealManagers: DealManager[]) {
   if (val === "Ответственный") {
-    const r = realtors.find((x) => x.id === lead.assignedRealtorId);
+    const r = dealManagers.find((x) => x.id === lead.assignedDealManagerId);
     return r ? r.name : "Ответственный (не назначен)";
   }
   return val || "";
@@ -33,16 +33,16 @@ function resolveRecipient(val: string | undefined, lead: Lead, realtors: Realtor
 function resolveAssignFromRobot(
   a: StageAutomation,
   lead: Lead,
-  realtors: Realtor[],
-): { assignUserId?: string; assignRealtorId?: string } {
+  dealManagers: DealManager[],
+): { assignUserId?: string; assignDealManagerId?: string } {
   if (a.assignUserId) return { assignUserId: a.assignUserId };
   if (a.recipient === "Ответственный" && lead.assignedUserId) {
     return { assignUserId: lead.assignedUserId };
   }
-  const byName = realtors.find((r) => r.name === a.recipient);
+  const byName = dealManagers.find((r) => r.name === a.recipient);
   if (byName) {
     return {
-      assignRealtorId: byName.id,
+      assignDealManagerId: byName.id,
       assignUserId: byName.userId || undefined,
     };
   }
@@ -54,7 +54,7 @@ export function runStageAutomations(
   stage: StageRef,
   lead: Lead,
   channels: Channel[],
-  realtors: Realtor[],
+  dealManagers: DealManager[],
   allStages: StageRef[] = [],
 ): AutomationResult {
   const result: AutomationResult = {
@@ -65,7 +65,7 @@ export function runStageAutomations(
 
   for (const a of automations || []) {
     const author = a.author || "Система";
-    const rcpt = resolveRecipient(a.recipient, lead, realtors);
+    const rcpt = resolveRecipient(a.recipient, lead, dealManagers);
 
     if (a.type === "reply") {
       const ch = channels.find((c) => c.id === a.channelId);
@@ -104,9 +104,9 @@ export function runStageAutomations(
         author: "Автоматизация",
       });
     } else if (a.type === "assign") {
-      const assign = resolveAssignFromRobot(a, lead, realtors);
+      const assign = resolveAssignFromRobot(a, lead, dealManagers);
       if (assign.assignUserId) result.assignUserId = assign.assignUserId;
-      if (assign.assignRealtorId) result.assignRealtorId = assign.assignRealtorId;
+      if (assign.assignDealManagerId) result.assignDealManagerId = assign.assignDealManagerId;
       result.messages.push({
         text: `Назначен ответственный по сделке «${lead.name}»`,
         leadId: lead.id,

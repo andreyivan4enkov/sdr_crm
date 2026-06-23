@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Users, TrendingUp, Plug, CheckCircle2, SlidersHorizontal, Plus, Trash2, Pencil,
-  Target, BarChart3, X, Save,
+  Target, BarChart3, X, Save, MessageSquare, Sparkles,
 } from "lucide-react";
 import {
   computeMetric, evaluateGoal, funnelStages, formatMetricValue, KPI_METRIC_LABELS,
-  metricNeedsField, metricNeedsStage, OPERATOR_LABELS, type AnalyticsData,
+  metricNeedsField, metricNeedsStage, OPERATOR_LABELS, leadStageId, type AnalyticsData,
 } from "../lib/analytics-metrics";
 import {
   api, hasPermission, type AnalyticsDashboard, type AnalyticsGoal, type AnalyticsWidget,
   type AuthUser, type Call, type Channel, type Field, type Lead, type Stage, type Task,
+  type AiboardDashboardQueryResult,
 } from "../api/client";
+import { useUiT } from "../lib/i18n-labels";
+import { useAsyncLoad } from "../hooks/useAsyncLoad";
+import { NlDashboard } from "../components/analytics/NlDashboard";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -21,6 +25,8 @@ type Props = {
   data: CrmSlice;
   user: AuthUser;
   StageBadge: React.FC<{ stage: Stage }>;
+  onOpenAiChat?: () => void;
+  onOpenAiDashboards?: () => void;
 };
 
 function kpiIcon(metric: string) {
@@ -45,7 +51,8 @@ function emptyDashboard(name: string, sortOrder: number, stages: Stage[]): Analy
   };
 }
 
-export function AnalyticsPage({ t, data, user, StageBadge }: Props) {
+export function AnalyticsPage({ t, data, user, StageBadge, onOpenAiChat, onOpenAiDashboards }: Props) {
+  const { tr } = useUiT();
   const canManage = hasPermission(user, "analytics.manage");
   const [dashboards, setDashboards] = useState<AnalyticsDashboard[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -56,7 +63,19 @@ export function AnalyticsPage({ t, data, user, StageBadge }: Props) {
   const [err, setErr] = useState("");
   const [editWidget, setEditWidget] = useState<AnalyticsWidget | null>(null);
   const [editGoal, setEditGoal] = useState<AnalyticsGoal | null>(null);
-  const [calls, setCalls] = useState<Call[]>([]);
+  const canViewCalls = hasPermission(user, "calls.view");
+  const callsLoad = useAsyncLoad(
+    () => api.getCalls().then((r) => r.calls),
+    [user],
+    canViewCalls,
+  );
+  const aiDashLoad = useAsyncLoad(async () => {
+    const r = await api.getAiboardDashboard();
+    const widgets = (r.graph as { widgets?: (AiboardDashboardQueryResult & { id: string })[] } | null)?.widgets;
+    return Array.isArray(widgets) ? widgets.map((w, i) => ({ ...w, id: w.id || `w_${i}` })) : [];
+  }, []);
+  const calls = callsLoad.data ?? [];
+  const aiDashboards = aiDashLoad.data ?? [];
 
   const analyticsData: AnalyticsData = useMemo(() => ({
     ...data,
@@ -67,13 +86,13 @@ export function AnalyticsPage({ t, data, user, StageBadge }: Props) {
     api.getAnalytics().then((r) => {
       setDashboards(r.dashboards);
       setActiveId(r.dashboards[0]?.id ?? null);
-    }).catch(() => setErr("Не удалось загрузить дашборды")).finally(() => setLoading(false));
+      setErr("");
+    }).catch((e: unknown) => {
+      const status = (e as Error & { status?: number }).status;
+      if (status === 403) setErr("Нет права analytics.view — обратитесь к администратору.");
+      else setErr(e instanceof Error ? e.message : "Не удалось загрузить дашборды");
+    }).finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!hasPermission(user, "calls.view")) return;
-    api.getCalls().then((r) => setCalls(r.calls)).catch(() => {});
-  }, [user]);
 
   const working = draft ?? dashboards;
   const active = working.find((d) => d.id === activeId) ?? working[0] ?? null;
@@ -145,26 +164,40 @@ export function AnalyticsPage({ t, data, user, StageBadge }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-teal-600" />
-          <h2 className="font-semibold">Аналитика</h2>
+          <h2 className="font-semibold">{tr("analytics", undefined, "nav")}</h2>
         </div>
-        {canManage && (
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onOpenAiChat && (
+            <button type="button" onClick={onOpenAiChat}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-teal-500/40 text-teal-700 dark:text-teal-300 ${t.hover}`}>
+              <MessageSquare className="w-4 h-4" /> {tr("openAiChat", undefined, "analytics")}
+            </button>
+          )}
+          {onOpenAiDashboards && (
+            <button type="button" onClick={onOpenAiDashboards}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-teal-600 text-white hover:bg-teal-700`}>
+              <Sparkles className="w-4 h-4" /> {tr("openAiDashboards", undefined, "analytics")}
+            </button>
+          )}
+          {canManage && (
+            <>
             {settingsMode ? (
               <>
-                <button type="button" onClick={cancelEdit} className={`px-3 py-2 rounded-lg text-sm border ${t.border} ${t.muted}`}>Отмена</button>
+                <button type="button" onClick={cancelEdit} className={`px-3 py-2 rounded-lg text-sm border ${t.border} ${t.muted}`}>{tr("cancel", undefined, "common")}</button>
                 <button type="button" onClick={save} disabled={saving}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-60">
-                  <Save className="w-4 h-4" /> {saving ? "Сохранение…" : "Сохранить"}
+                  <Save className="w-4 h-4" /> {saving ? tr("saving", undefined, "analytics") : tr("save", undefined, "common")}
                 </button>
               </>
             ) : (
               <button type="button" onClick={startEdit}
                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border ${t.border} ${t.muted} ${t.hover}`}>
-                <SlidersHorizontal className="w-4 h-4" /> Настроить
+                <SlidersHorizontal className="w-4 h-4" /> {tr("configureDashboards", undefined, "analytics")}
               </button>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {working.length > 1 && (
@@ -200,20 +233,23 @@ export function AnalyticsPage({ t, data, user, StageBadge }: Props) {
       {err && <p className="text-sm text-rose-500">{err}</p>}
 
       {active ? (
-        <DashboardView t={t} data={analyticsData} dashboard={active} widgets={sortedWidgets} StageBadge={StageBadge} />
+        <DashboardView t={t} data={analyticsData} dashboard={active} widgets={sortedWidgets} StageBadge={StageBadge}
+          aiDashboards={aiDashboards} canManageAi={canManage} />
       ) : !err ? (
-        <p className={`text-sm ${t.muted}`}>Нет дашбордов. {canManage && "Нажмите «Настроить»."}</p>
+        <p className={`text-sm ${t.muted}`}>{tr("noDashboards", undefined, "analytics")} {canManage && tr("clickConfigure", undefined, "analytics")}</p>
       ) : null}
     </div>
   );
 }
 
-function DashboardView({ t, data, dashboard, widgets, StageBadge }: {
+function DashboardView({ t, data, dashboard, widgets, StageBadge, aiDashboards = [], canManageAi }: {
   t: Record<string, string>;
   data: CrmSlice;
   dashboard: AnalyticsDashboard;
   widgets: AnalyticsWidget[];
   StageBadge: React.FC<{ stage: Stage }>;
+  aiDashboards?: (AiboardDashboardQueryResult & { id: string })[];
+  canManageAi?: boolean;
 }) {
   const total = data.leads.length;
   const kpis = widgets.filter((w) => w.type === "kpi");
@@ -231,12 +267,37 @@ function DashboardView({ t, data, dashboard, widgets, StageBadge }: {
 
   return (
     <div className="space-y-6 w-full min-w-0 max-w-full overflow-x-hidden">
+      {aiDashboards.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-teal-500" />
+            <h3 className={`text-sm font-semibold ${t.text}`}>AI-дашборды из Реактора</h3>
+            {canManageAi && (
+              <span className={`text-xs ${t.muted}`}>Удаление — в Реакторе, фильтр «AI-дашборды»</span>
+            )}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {aiDashboards.map((d) => (
+              <div key={d.id}>
+                <NlDashboard
+                  t={t as never}
+                  title={d.manifest.title}
+                  chartType={d.manifest.chartType}
+                  rows={d.result.rows}
+                  kpi={d.result.kpi}
+                  measure={d.manifest.measure}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {kpis.length > 0 && (
         <div className={`grid gap-4 grid-cols-2 ${kpis.length >= 4 ? "lg:grid-cols-4" : kpis.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
           {kpis.map((w) => {
             if (w.type !== "kpi") return null;
             const Icon = kpiIcon(w.metric);
-            const value = computeMetric(w.metric, data, w.stageId, w.type === "kpi" && "fieldId" in w ? w.fieldId : undefined);
+            const value = computeMetric(w.metric, data, w.stageId, w.type === "kpi" && "fieldId" in w ? (w as { fieldId?: string }).fieldId : undefined);
             return (
               <div key={w.id} className={`bio-card bio-glass-panel p-4 ${t.surface} ${t.border}`}>
                 <div className="flex items-center justify-between">
@@ -284,7 +345,7 @@ function DashboardView({ t, data, dashboard, widgets, StageBadge }: {
             <h3 className="font-semibold mb-3">Воронка по этапам</h3>
             <div className="space-y-2">
               {funnelList.map((s) => {
-                const n = data.leads.filter((l) => l.status === s.id).length;
+                const n = data.leads.filter((l) => leadStageId(l) === s.id).length;
                 const pct = total ? (n / total) * 100 : 0;
                 return (
                   <div key={s.id} className="flex items-center gap-2 min-w-0">
@@ -308,7 +369,7 @@ function DashboardView({ t, data, dashboard, widgets, StageBadge }: {
             <h3 className="font-semibold mb-3">Последние обновления</h3>
             <div className={`divide-y ${t.divide}`}>
               {recentLeads.map((l) => {
-                const st = data.stages.find((s) => s.id === l.status);
+                const st = data.stages.find((s) => s.id === leadStageId(l));
                 return (
                   <div key={l.id} className="py-2.5 flex items-center justify-between text-sm gap-2">
                     <span className="font-medium truncate">

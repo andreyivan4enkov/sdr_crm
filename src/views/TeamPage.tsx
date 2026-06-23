@@ -12,7 +12,7 @@ type Theme = Record<string, string>;
 type Props = {
   t: Theme;
   user: AuthUser;
-  data: { leads: { assignedRealtorId?: string | null }[]; realtors: { id: string; userId?: string | null }[] };
+  data: { leads: { assignedDealManagerId?: string | null }[]; dealManagers: { id: string; userId?: string | null }[] };
   reload: () => void;
   Btn: React.FC<{ children: React.ReactNode; onClick: () => void; t: Theme; variant?: string; className?: string }>;
   TInput: React.FC<{ t: Theme; value: string; onChange: (v: string) => void; placeholder?: string }>;
@@ -139,9 +139,9 @@ export function TeamPage({ t, user, data, reload, Btn, TInput, Labeled, Sel }: P
   const byParent = useMemo(() => buildTree(orgUnits), [orgUnits]);
   const employeeCount = (unitId: string) => crmUsers.filter((u) => u.profileOrgUnitId === unitId).length;
   const leadCount = (userId: string) => {
-    const realtor = data.realtors.find((r) => r.userId === userId);
-    if (!realtor) return 0;
-    return data.leads.filter((l) => l.assignedRealtorId === realtor.id).length;
+    const dealManager = data.dealManagers.find((r) => r.userId === userId);
+    if (!dealManager) return 0;
+    return data.leads.filter((l) => l.assignedDealManagerId === dealManager.id).length;
   };
 
   const tabs: { k: Tab; label: string; icon: typeof Building2 }[] = [

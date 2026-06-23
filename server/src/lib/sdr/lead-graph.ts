@@ -62,6 +62,54 @@ export class LeadSdrGraph {
     if (!query) return [];
     return this.graph.multiHopSearch(leadId, query, hops);
   }
+
+  /** Percolation expansion: BFS with vector similarity threshold; tau at first component-size jump. */
+  percolationExpand(seedId: string, minSimilarity = 0.82): string[] {
+    const seedSdr = this.graph.getNodeSdr(seedId);
+    if (!seedSdr) return [];
+
+    const allIds = this.graph.nodeIds();
+    const adj = new Map<string, Set<string>>();
+    for (const id of allIds) {
+      const neighbors = new Set(this.graph.neighbors(id));
+      for (const other of allIds) {
+        if (other !== id && this.graph.sdrSimilarity(id, other) >= minSimilarity) {
+          neighbors.add(other);
+        }
+      }
+      adj.set(id, neighbors);
+    }
+
+    const bfs = (tau: number) => {
+      const visited = new Set<string>();
+      const queue = [seedId];
+      while (queue.length) {
+        const cur = queue.shift()!;
+        if (visited.has(cur)) continue;
+        if (this.graph.sdrSimilarity(seedId, cur) < tau) continue;
+        visited.add(cur);
+        for (const nb of adj.get(cur) ?? []) {
+          if (!visited.has(nb)) queue.push(nb);
+        }
+      }
+      return visited;
+    };
+
+    let prevSize = 0;
+    let bestSet = bfs(minSimilarity);
+    for (let tau = 0.95; tau >= 0.5; tau -= 0.05) {
+      const comp = bfs(tau);
+      const jump = comp.size - prevSize;
+      if (jump >= 2 && prevSize > 0) {
+        bestSet = comp;
+        break;
+      }
+      prevSize = comp.size;
+      if (comp.size > bestSet.size) bestSet = comp;
+    }
+
+    return [...bestSet].filter((id) => id !== seedId).slice(0, 50);
+  }
 }
 
 export const leadSdrGraph = new LeadSdrGraph();

@@ -1,7 +1,7 @@
 import "../env.js";
-import { and, isNull, lt, eq } from "drizzle-orm";
+import { and, isNull, lt, eq, inArray } from "drizzle-orm";
 import { db, closeDb } from "../db/index.js";
-import { leads } from "../db/schema.js";
+import { leads, blueprintInstances } from "../db/schema.js";
 import { eraseLeadPersonalData } from "../lib/lead-pd.js";
 import { writeAudit } from "../lib/audit.js";
 import { logger } from "../lib/logger.js";
@@ -31,6 +31,16 @@ async function run() {
   }
 
   logger.info("retention.purge_complete", { count, retentionDays: days });
+
+  const bpCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  await db.delete(blueprintInstances).where(
+    and(
+      inArray(blueprintInstances.state, ["COMPLETED", "FAILED"]),
+      lt(blueprintInstances.updatedAt, bpCutoff),
+    ),
+  );
+  logger.info("retention.blueprint_instances_purged", { cutoff: bpCutoff.toISOString() });
+
   await closeDb();
 }
 

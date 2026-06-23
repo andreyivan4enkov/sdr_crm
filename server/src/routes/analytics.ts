@@ -121,6 +121,6 @@ analyticsRoutes.put("/dashboards", requirePermission("analytics.manage"), async 
 analyticsRoutes.get("/funnel-ca", requirePermission("analytics.view"), async (c) => {
   const { computeFunnelCaMetric } = await import("../lib/sdr/funnel-ca.js");
   const metric = await computeFunnelCaMetric();
-  if (!metric) return c.json({ error: "SDR funnel CA disabled" }, 404);
+  if (!metric) return c.json({ error: "Funnel CA metric disabled" }, 404);
   return c.json({ metric });
 });

@@ -2,12 +2,18 @@ import { Hono } from "hono";
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../db/index.js";
-import { users, roles, profiles, realtors, leads, orgUnits } from "../../db/schema.js";
+import { users, roles, profiles, dealManagers, leads, orgUnits } from "../../db/schema.js";
 import { requireAuth, requirePermission, requireAnyPermission, type AppEnv } from "../../middleware/auth.js";
 import { createInviteToken, inviteUrl } from "../../lib/invites.js";
-import { inviteableRoleNames } from "../../lib/permissions.js";
+import { inviteableRoleNames, canAssignRole } from "../../lib/permissions.js";
 import { writeAudit } from "../../lib/audit.js";
 import { getClientIp } from "../../lib/clientIp.js";
+import { purgeTaskCommentsByUser } from "../../lib/gdpr-task-comments.js";
+
+async function syncDealManagerRole(userId: string, roleId: string | null | undefined) {
+  if (!roleId) return;
+  await db.update(dealManagers).set({ roleId }).where(eq(dealManagers.userId, userId));
+}
 
 export const adminUserRoutes = new Hono<AppEnv>();
 
@@ -111,13 +117,30 @@ adminUserRoutes.patch("/:id", requirePermission("users.manage"), async (c) => {
   }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
+  const actor = c.get("user");
+  const userId = c.req.param("id");
+  const [existing] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!existing) return c.json({ error: "Not found" }, 404);
+
+  if (body.data.status === "active" && existing.status === "pending") {
+    return c.json({ error: "Используйте POST /approve для активации pending-пользователя" }, 400);
+  }
+
+  if (body.data.roleId) {
+    const [targetRole] = await db.select().from(roles).where(eq(roles.id, body.data.roleId)).limit(1);
+    if (!targetRole) return c.json({ error: "Role not found" }, 404);
+    if (!canAssignRole(actor.roleName, targetRole.name)) {
+      return c.json({ error: "Недостаточно прав для назначения этой роли" }, 403);
+    }
+  }
+
   const [user] = await db.update(users).set({
     ...body.data,
     updatedAt: new Date(),
-  }).where(eq(users.id, c.req.param("id"))).returning();
+  }).where(eq(users.id, userId)).returning();
 
   if (!user) return c.json({ error: "Not found" }, 404);
-  const actor = c.get("user");
+  if (body.data.roleId) await syncDealManagerRole(userId, body.data.roleId);
   await writeAudit({
     userId: actor.id, userLogin: actor.login, action: "user.update",
     entityType: "user", entityId: user.id,
@@ -138,6 +161,15 @@ adminUserRoutes.post("/:id/approve", requirePermission("users.manage"), async (c
   if (!finalRoleId) {
     const [opRole] = await db.select().from(roles).where(eq(roles.name, "operator")).limit(1);
     finalRoleId = opRole?.id;
+  }
+
+  if (finalRoleId) {
+    const [targetRole] = await db.select().from(roles).where(eq(roles.id, finalRoleId)).limit(1);
+    if (!targetRole) return c.json({ error: "Role not found" }, 404);
+    const actor = c.get("user");
+    if (!canAssignRole(actor.roleName, targetRole.name)) {
+      return c.json({ error: "Недостаточно прав для назначения этой роли" }, 403);
+    }
   }
 
   const userId = c.req.param("id");
@@ -163,9 +195,9 @@ adminUserRoutes.post("/:id/approve", requirePermission("users.manage"), async (c
   const [updatedProfile] = await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
 
   if (updatedProfile && role) {
-    const [existingRealtor] = await db.select().from(realtors).where(eq(realtors.userId, userId)).limit(1);
-    if (!existingRealtor) {
-      await db.insert(realtors).values({
+    const [existingDealManager] = await db.select().from(dealManagers).where(eq(dealManagers.userId, userId)).limit(1);
+    if (!existingDealManager) {
+      await db.insert(dealManagers).values({
         name: updatedProfile.name,
         region: updatedProfile.region?.trim() || "—",
         phone: updatedProfile.phone,
@@ -175,14 +207,14 @@ adminUserRoutes.post("/:id/approve", requirePermission("users.manage"), async (c
         roleId: finalRoleId,
       });
     } else {
-      await db.update(realtors).set({
+      await db.update(dealManagers).set({
         name: updatedProfile.name,
-        region: updatedProfile.region?.trim() || existingRealtor.region,
+        region: updatedProfile.region?.trim() || existingDealManager.region,
         phone: updatedProfile.phone,
         orgUnitId: finalOrgUnitId,
         position: updatedProfile.position,
         roleId: finalRoleId,
-      }).where(eq(realtors.id, existingRealtor.id));
+      }).where(eq(dealManagers.id, existingDealManager.id));
     }
   }
 
@@ -221,30 +253,33 @@ adminUserRoutes.post("/:id/dismiss", requirePermission("users.manage"), async (c
   const [target] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!target || target.status !== "active") return c.json({ error: "Сотрудник не найден" }, 404);
 
-  const [realtor] = await db.select().from(realtors).where(eq(realtors.userId, userId)).limit(1);
-  let delegateRealtorId: string | null = null;
+  const [dealManager] = await db.select().from(dealManagers).where(eq(dealManagers.userId, userId)).limit(1);
+  let delegateDealManagerId: string | null = null;
 
   if (body.data.delegateToUserId) {
     const [delegateUser] = await db.select().from(users).where(and(eq(users.id, body.data.delegateToUserId), eq(users.status, "active"))).limit(1);
     if (!delegateUser) return c.json({ error: "Сотрудник для делегирования не найден" }, 404);
-    const [delegateRealtor] = await db.select().from(realtors).where(eq(realtors.userId, body.data.delegateToUserId)).limit(1);
-    if (!delegateRealtor) return c.json({ error: "У выбранного сотрудника нет карточки в команде" }, 400);
-    delegateRealtorId = delegateRealtor.id;
+    const [delegateDealManager] = await db.select().from(dealManagers).where(eq(dealManagers.userId, body.data.delegateToUserId)).limit(1);
+    if (!delegateDealManager) return c.json({ error: "У выбранного сотрудника нет карточки в команде" }, 400);
+    delegateDealManagerId = delegateDealManager.id;
   }
 
-  if (realtor) {
-    if (delegateRealtorId) {
-      await db.update(leads).set({ assignedRealtorId: delegateRealtorId, updatedAt: new Date() }).where(eq(leads.assignedRealtorId, realtor.id));
+  if (dealManager) {
+    if (delegateDealManagerId) {
+      await db.update(leads).set({ assignedDealManagerId: delegateDealManagerId, updatedAt: new Date() }).where(eq(leads.assignedDealManagerId, dealManager.id));
     } else {
-      await db.update(leads).set({ assignedRealtorId: null, updatedAt: new Date() }).where(eq(leads.assignedRealtorId, realtor.id));
+      await db.update(leads).set({ assignedDealManagerId: null, updatedAt: new Date() }).where(eq(leads.assignedDealManagerId, dealManager.id));
     }
-    await db.delete(realtors).where(eq(realtors.id, realtor.id));
+    await db.delete(dealManagers).where(eq(dealManagers.id, dealManager.id));
   }
 
   const [user] = await db.update(users).set({
     status: "rejected",
     updatedAt: new Date(),
   }).where(eq(users.id, userId)).returning();
+
+  const [profile] = await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+  await purgeTaskCommentsByUser(userId, profile?.name || target.login);
 
   const actor = c.get("user");
   await writeAudit({
@@ -253,5 +288,5 @@ adminUserRoutes.post("/:id/dismiss", requirePermission("users.manage"), async (c
     ip: getClientIp(c), userAgent: c.req.header("user-agent"),
     meta: { delegateToUserId: body.data.delegateToUserId || null },
   });
-  return c.json({ user, message: delegateRealtorId ? "Сотрудник уволен, сделки переданы" : "Сотрудник уволен" });
+  return c.json({ user, message: delegateDealManagerId ? "Сотрудник уволен, сделки переданы" : "Сотрудник уволен" });
 });

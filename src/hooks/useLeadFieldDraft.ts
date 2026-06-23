@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { pushUndo } from "./useUndoStack";
 
 type Options<T> = {
   leadId: string;
@@ -35,10 +36,12 @@ export function useLeadFieldDraft<T>({
       return;
     }
     if (next === serverValue) return;
+    const prev = serverValue;
     setSaving(true);
     try {
       await onSave(next);
       setError("");
+      pushUndo("изменение поля", () => { void onSave(prev); });
     } catch (e) {
       setError((e as Error).message || "Не удалось сохранить");
       setValueState(serverValue);

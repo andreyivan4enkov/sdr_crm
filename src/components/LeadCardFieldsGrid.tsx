@@ -47,8 +47,11 @@ function isUnsetGrid(f: Field) {
   return (f.gridRow ?? 0) === 0 && (f.gridCol ?? 0) === 0;
 }
 
-export function buildGridItems(fields: Field[], cardLayout?: LeadCardLayout): GridFieldItem[] {
-  const builtins: GridFieldItem[] = (Object.keys(DEFAULT_BUILTIN_LAYOUT) as BuiltinFieldKey[]).map((key) => ({
+export function buildGridItems(fields: Field[], cardLayout?: LeadCardLayout, hiddenKeys?: string[]): GridFieldItem[] {
+  const hidden = new Set(hiddenKeys || []);
+  const builtins: GridFieldItem[] = (Object.keys(DEFAULT_BUILTIN_LAYOUT) as BuiltinFieldKey[])
+    .filter((key) => !hidden.has(key))
+    .map((key) => ({
     id: `builtin:${key}`,
     kind: "builtin" as const,
     builtinKey: key,
@@ -58,10 +61,12 @@ export function buildGridItems(fields: Field[], cardLayout?: LeadCardLayout): Gr
     },
   }));
 
-  const maxBuiltinRow = Math.max(...builtins.map((b) => b.layout.gridRow), 1);
+  const maxBuiltinRow = builtins.length ? Math.max(...builtins.map((b) => b.layout.gridRow), 1) : 1;
   const baseRow = maxBuiltinRow + 1;
 
-  const customs = fields.map((f, i) => {
+  const customs = fields
+    .filter((f) => !hidden.has(f.id))
+    .map((f, i) => {
     const fallback = defaultCustomLayout(i, baseRow);
     const unset = isUnsetGrid(f);
     return {
@@ -144,6 +149,7 @@ type LeadCardFieldsGridProps = {
   t: Record<string, string>;
   fields: Field[];
   cardLayout?: LeadCardLayout;
+  hiddenCardFields?: string[];
   editable: boolean;
   onSaveLayout: (cardLayout: LeadCardLayout, fields: Field[]) => void | Promise<void>;
   renderBuiltin: (key: BuiltinFieldKey) => React.ReactNode;
@@ -151,18 +157,18 @@ type LeadCardFieldsGridProps = {
 };
 
 export function LeadCardFieldsGrid({
-  t, fields, cardLayout, editable, onSaveLayout, renderBuiltin, renderCustom,
+  t, fields, cardLayout, hiddenCardFields, editable, onSaveLayout, renderBuiltin, renderCustom,
 }: LeadCardFieldsGridProps) {
   const gridRef = useRef<HTMLDivElement>(null);
-  const [items, setItems] = useState<GridFieldItem[]>(() => buildGridItems(fields, cardLayout));
+  const [items, setItems] = useState<GridFieldItem[]>(() => buildGridItems(fields, cardLayout, hiddenCardFields));
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [hoverCell, setHoverCell] = useState<GridLayoutCell | null>(null);
   const [layoutMode, setLayoutMode] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setItems(buildGridItems(fields, cardLayout));
-  }, [fields, cardLayout]);
+    setItems(buildGridItems(fields, cardLayout, hiddenCardFields));
+  }, [fields, cardLayout, hiddenCardFields]);
 
   const maxRow = useMemo(
     () => Math.max(2, ...items.map((it) => it.layout.gridRow)) + 1,

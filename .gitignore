@@ -37,6 +37,7 @@ Thumbs.db
 
 # Local embedded DB
 server/data/
+server/storage/
 
 # Environment
 .env
@@ -50,3 +51,6 @@ cloudpbx.beeline.ru.md
 
 # Test / coverage
 coverage/
+
+# Local secrets (dev keys)
+ключи/

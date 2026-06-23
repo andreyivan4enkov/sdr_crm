@@ -7,6 +7,14 @@ const AUTH_APPS = [
   { name: "Яндекс Ключ", hint: "App Store / Google Play / RuStore" },
 ];
 
+function totpSecretFromUri(uri: string): string {
+  try {
+    return new URL(uri).searchParams.get("secret") || "";
+  } catch {
+    return "";
+  }
+}
+
 export function TotpSettings({ t, Btn, TInput }: {
   t: Record<string, string>;
   Btn: React.FC<{ children: React.ReactNode; onClick: () => void; t: Record<string, string>; variant?: string; className?: string }>;
@@ -95,7 +103,7 @@ export function TotpSettings({ t, Btn, TInput }: {
               try {
                 const r = await api.totpSetup();
                 setUri(r.uri);
-                setSecret(r.secret);
+                setSecret(totpSecretFromUri(r.uri));
               } catch (e) {
                 setErr((e as Error).message);
               }
@@ -124,7 +132,7 @@ export function TotpSettings({ t, Btn, TInput }: {
               <Btn t={t} onClick={async () => {
                 setErr("");
                 try {
-                  const r = await api.totpEnable(secret, code);
+                  const r = await api.totpEnable(code);
                   setBackupCodes(r.backupCodes);
                   setStatus({ ...status, enabled: true });
                   setMsg("2FA включена. Сохраните резервные коды — они показываются один раз.");

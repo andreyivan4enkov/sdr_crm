@@ -1,6 +1,9 @@
 import "../env.js";
-import { closeDb } from "./index.js";
-import { runMigrations } from "./migrations-run.js";
+import { pgliteDataPath, waitForStaleLock } from "./pglite-lifecycle.js";
+
+await waitForStaleLock(pgliteDataPath());
+const { closeDb } = await import("./index.js");
+const { runMigrations } = await import("./migrations-run.js");
 
 await runMigrations();
 await closeDb();

@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { api, normalizeLead, type Lead, type Stage, type Field, type Channel, type Realtor, type Task, type LeadCardLayout, type TeamMember, type Pipeline } from "../api/client";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { api, normalizeLead, type Lead, type Stage, type Field, type Channel, type DealManager, type Task, type LeadCardLayout, type LeadCardBlock, type TeamMember, type Pipeline } from "../api/client";
 
 export type CrmData = {
   leads: ReturnType<typeof normalizeLead>[];
@@ -7,15 +7,21 @@ export type CrmData = {
   stages: Stage[];
   fields: Field[];
   channels: Channel[];
-  realtors: Realtor[];
+  dealManagers: DealManager[];
   employees: TeamMember[];
   tasks: Task[];
   cardLayout?: LeadCardLayout;
+  hiddenCardFields?: string[];
+  leadCardBlocks?: LeadCardBlock[];
 };
+
+const DB_RECOVER_HINT = /повреждена|dev:recover|перезапускается|could not seek|Aborted/i;
 
 export function useCrmData(enabled: boolean) {
   const [data, setData] = useState<CrmData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const seqRef = useRef(0);
 
   const fetchData = useCallback(async () => {
     const [settings, leadsRes, tasksRes, teamRes] = await Promise.all([
@@ -30,30 +36,48 @@ export function useCrmData(enabled: boolean) {
       fields: settings.fields,
       channels: settings.channels,
       cardLayout: settings.cardLayout,
+      hiddenCardFields: settings.hiddenCardFields,
+      leadCardBlocks: settings.leadCardBlocks,
       leads: leadsRes.leads.map(normalizeLead),
       tasks: tasksRes.tasks,
-      realtors: teamRes.realtors,
+      dealManagers: teamRes.dealManagers,
       employees: teamRes.employees || [],
     };
   }, []);
 
   const reload = useCallback(async () => {
     if (!enabled) return;
+    const id = ++seqRef.current;
     setLoading(true);
+    setLoadError("");
     try {
-      setData(await fetchData());
-    } catch {
-      /* API недоступен — data остаётся null, UI покажет сообщение */
+      const next = await fetchData();
+      if (id === seqRef.current) setData(next);
+    } catch (e) {
+      if (id !== seqRef.current) return;
+      const msg = e instanceof Error ? e.message : "Не удалось загрузить данные";
+      if (DB_RECOVER_HINT.test(msg)) {
+        try {
+          const r = await api.recoverDevDatabase();
+          if (r.ok && id === seqRef.current) {
+            setData(await fetchData());
+            return;
+          }
+        } catch { /* fall through */ }
+      }
+      if (id === seqRef.current) setLoadError(msg);
     } finally {
-      setLoading(false);
+      if (id === seqRef.current) setLoading(false);
     }
   }, [enabled, fetchData]);
 
   /** Обновление без экрана «Загрузка CRM…» — для SSE и фонового опроса */
   const reloadSilent = useCallback(async () => {
     if (!enabled) return;
+    const id = ++seqRef.current;
     try {
-      setData(await fetchData());
+      const next = await fetchData();
+      if (id === seqRef.current) setData(next);
     } catch { /* сеть — оставляем текущие данные */ }
   }, [enabled, fetchData]);
 
@@ -63,7 +87,7 @@ export function useCrmData(enabled: boolean) {
     setData((d) => d ? { ...d, ...patch } : d);
   };
 
-  return { data, loading, reload, reloadSilent, updateData, setData };
+  return { data, loading, loadError, reload, reloadSilent, updateData, setData };
 }
 
 export async function persistStages(stages: Stage[]) {
@@ -84,6 +108,11 @@ export async function persistFields(fields: Field[]) {
 export async function persistCardLayout(cardLayout: LeadCardLayout) {
   const { cardLayout: c } = await api.updateCardLayout(cardLayout);
   return c;
+}
+
+export async function persistLeadCardBlocks(blocks: LeadCardBlock[]) {
+  const { leadCardBlocks } = await api.updateLeadCardBlocks(blocks);
+  return leadCardBlocks;
 }
 
 export async function persistChannels(channels: Partial<Channel>[]) {

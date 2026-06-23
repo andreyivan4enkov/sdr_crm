@@ -2,10 +2,14 @@ import { Hono } from "hono";
 import { eq, desc, or, isNull, inArray, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.js";
-import { tasks, leads, profiles, type TaskChecklistItem, type TaskComment, type TaskStatus, type TaskPriority } from "../db/schema.js";
+import { tasks, leads, profiles, type TaskChecklistItem, type TaskComment, type TaskStatus, type TaskPriority, type TaskFile } from "../db/schema.js";
 import { requireAuth, requirePermission, type AppEnv } from "../middleware/auth.js";
 import { accessibleLeadIds, canAccessLead, resolveLeadScope } from "../lib/lead-access.js";
+import { canAccessTask } from "../lib/task-access.js";
+import { randomUUID } from "node:crypto";
+import { normalizeTaskFilesInput, readTaskFile, MAX_TASK_FILE_DATAURL_CHARS } from "../lib/task-file-storage.js";
 import { notifyTaskCreated, notifyTaskUpdated } from "../lib/task-notify.js";
+import { triggerBlueprintsForTaskChange } from "../lib/blueprint/trigger-dispatch.js";
 
 const checklistItemSchema = z.object({
   id: z.string().min(1),
@@ -17,6 +21,10 @@ const taskStatusSchema = z.enum(["new", "in_progress", "waiting", "deferred", "c
 const taskPrioritySchema = z.enum(["low", "normal", "high"]);
 
 function serializeTask(row: typeof tasks.$inferSelect) {
+  const files = (row.files || []).map((f) => ({
+    ...f,
+    downloadUrl: f.storagePath ? `/api/tasks/${row.id}/files/${f.id}` : undefined,
+  }));
   return {
     id: row.id,
     text: row.text,
@@ -36,7 +44,7 @@ function serializeTask(row: typeof tasks.$inferSelect) {
     watchers: (row.watchers || []) as string[],
     coExecutors: (row.coExecutors || []) as string[],
     tags: (row.tags || []) as string[],
-    files: (row.files || []) as import("../db/schema.js").TaskFile[],
+    files: files as import("../db/schema.js").TaskFile[],
     comments: (row.comments || []) as TaskComment[],
     pinnedResult: row.pinnedResult ?? undefined,
     notifyParticipants: row.notifyParticipants ?? true,
@@ -84,22 +92,6 @@ export const taskRoutes = new Hono<AppEnv>();
 
 taskRoutes.use("*", requireAuth, requirePermission("leads.read"));
 
-async function canAccessTask(user: import("../db/schema.js").AuthUser, task: {
-  leadId?: string | null;
-  assignee?: string | null;
-  assigneeUserId?: string | null;
-  coExecutors?: string[] | null;
-  watchers?: string[] | null;
-}) {
-  const scope = await resolveLeadScope(user);
-  if (scope.mode === "all") return true;
-  if (isParticipant(user, task)) return true;
-  if (!task.leadId) return false;
-  const [lead] = await db.select().from(leads).where(eq(leads.id, task.leadId)).limit(1);
-  if (!lead) return false;
-  return canAccessLead(user, lead);
-}
-
 taskRoutes.get("/", async (c) => {
   const user = c.get("user");
   const scope = await resolveLeadScope(user);
@@ -142,7 +134,24 @@ taskRoutes.get("/", async (c) => {
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
 
-  return c.json({ tasks: filtered.map(serializeTask) });
+  const limit = Math.min(Math.max(Number(c.req.query("limit") || 200), 1), 500);
+  const offset = Math.max(Number(c.req.query("offset") || 0), 0);
+
+  return c.json({
+    tasks: filtered.slice(offset, offset + limit).map(serializeTask),
+    total: filtered.length,
+    limit,
+    offset,
+  });
+});
+
+const taskFileInputSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(255),
+  mimeType: z.string().max(128).optional(),
+  dataUrl: z.string().max(MAX_TASK_FILE_DATAURL_CHARS).optional(),
+  storagePath: z.string().max(512).optional(),
+  createdAt: z.string(),
 });
 
 const createBodySchema = z.object({
@@ -161,13 +170,7 @@ const createBodySchema = z.object({
   creatorUserId: z.string().uuid().optional().nullable(),
   reviewerUserId: z.string().uuid().optional().nullable(),
   tags: z.array(z.string().min(1).max(64)).optional(),
-  files: z.array(z.object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    mimeType: z.string().optional(),
-    dataUrl: z.string().optional(),
-    createdAt: z.string(),
-  })).optional(),
+  files: z.array(taskFileInputSchema).max(20).optional(),
   notifyParticipants: z.boolean().optional(),
 });
 
@@ -186,7 +189,13 @@ taskRoutes.post("/", requirePermission("leads.write"), async (c) => {
     body.data.assignee || user.profile?.name || user.login,
   );
 
+  const taskId = randomUUID();
+  const files = body.data.files?.length
+    ? await normalizeTaskFilesInput(taskId, body.data.files)
+    : [];
+
   const [task] = await db.insert(tasks).values({
+    id: taskId,
     text: body.data.text,
     description: body.data.description,
     assignee: assigneeName,
@@ -203,12 +212,19 @@ taskRoutes.post("/", requirePermission("leads.write"), async (c) => {
     coExecutors: body.data.coExecutors || [],
     reviewerUserId: body.data.reviewerUserId || null,
     tags: body.data.tags || [],
-    files: body.data.files || [],
+    files,
     notifyParticipants: body.data.notifyParticipants ?? true,
     done: false,
   }).returning();
 
   void notifyTaskCreated(task, user.id);
+  void triggerBlueprintsForTaskChange({
+    taskId: task.id,
+    before: null,
+    after: task,
+    isCreate: true,
+    userId: user.id,
+  }).catch(() => {});
 
   return c.json({ task: serializeTask(task) }, 201);
 });
@@ -251,7 +267,9 @@ taskRoutes.patch("/:id", requirePermission("leads.write"), async (c) => {
   if (body.data.creatorUserId !== undefined) patch.creatorUserId = body.data.creatorUserId;
   if (body.data.reviewerUserId !== undefined) patch.reviewerUserId = body.data.reviewerUserId;
   if (body.data.tags !== undefined) patch.tags = body.data.tags;
-  if (body.data.files !== undefined) patch.files = body.data.files;
+  if (body.data.files !== undefined) {
+    patch.files = await normalizeTaskFilesInput(c.req.param("id"), body.data.files);
+  }
   if (body.data.notifyParticipants !== undefined) patch.notifyParticipants = body.data.notifyParticipants;
   if (body.data.assigneeUserId !== undefined) {
     patch.assigneeUserId = body.data.assigneeUserId;
@@ -271,6 +289,13 @@ taskRoutes.patch("/:id", requirePermission("leads.write"), async (c) => {
     completed,
   });
 
+  void triggerBlueprintsForTaskChange({
+    taskId: task.id,
+    before: existing,
+    after: task,
+    userId: user.id,
+  }).catch(() => {});
+
   return c.json({ task: serializeTask(task) });
 });
 
@@ -287,22 +312,24 @@ taskRoutes.post("/:id/comments", requirePermission("leads.write"), async (c) => 
   const body = z.object({ text: z.string().min(1).max(4000) }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
-  const [existing] = await db.select().from(tasks).where(eq(tasks.id, c.req.param("id"))).limit(1);
-  if (!existing || !(await canAccessTask(user, existing))) return c.json({ error: "Not found" }, 404);
-
-  const comment: TaskComment = {
+  const taskId = c.req.param("id");
+  const newComment: TaskComment = {
     id: crypto.randomUUID(),
     text: body.data.text.trim(),
     author: user.profile?.name || user.login,
     authorUserId: user.id,
     createdAt: new Date().toISOString(),
   };
-  const comments = [...(existing.comments || []), comment];
-
-  const [task] = await db.update(tasks).set({ comments, updatedAt: new Date() }).where(eq(tasks.id, c.req.param("id"))).returning();
+  const [task] = await db.transaction(async (tx: typeof db) => {
+    const [existing] = await tx.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+    if (!existing || !(await canAccessTask(user, existing))) return [null];
+    const comments = [...(existing.comments || []), newComment];
+    return tx.update(tasks).set({ comments, updatedAt: new Date() }).where(eq(tasks.id, taskId)).returning();
+  });
+  if (!task) return c.json({ error: "Not found" }, 404);
   void notifyTaskUpdated(task, { actorUserId: user.id, comment: true });
 
-  return c.json({ task: serializeTask(task), comment });
+  return c.json({ task: serializeTask(task), comment: newComment });
 });
 
 taskRoutes.post("/:id/pin-result", requirePermission("leads.write"), async (c) => {
@@ -338,4 +365,26 @@ taskRoutes.post("/:id/pin-result", requirePermission("leads.write"), async (c) =
   void notifyTaskUpdated(task, { actorUserId: user.id, pinned: true });
 
   return c.json({ task: serializeTask(task) });
+});
+
+taskRoutes.get("/:id/files/:fileId", requirePermission("leads.read"), async (c) => {
+  const user = c.get("user");
+  const [existing] = await db.select().from(tasks).where(eq(tasks.id, c.req.param("id"))).limit(1);
+  if (!existing || !(await canAccessTask(user, existing))) return c.json({ error: "Not found" }, 404);
+
+  const fileId = c.req.param("fileId");
+  const file = (existing.files || []).find((f: TaskFile) => f.id === fileId);
+  if (!file?.storagePath) return c.json({ error: "Not found" }, 404);
+
+  try {
+    const { buf } = await readTaskFile(file.storagePath);
+    return new Response(buf, {
+      headers: {
+        "Content-Type": file.mimeType || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(file.name)}"`,
+      },
+    });
+  } catch {
+    return c.json({ error: "Not found" }, 404);
+  }
 });

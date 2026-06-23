@@ -23,6 +23,10 @@ class LeadFptmScoring {
   private fptm = new Fptm(8, FEATURES.length, 2);
   private stageOrder: string[] = [];
   private ready = false;
+  /** Precision-gated ensemble: rolling error variance per signal channel */
+  private signalErrors: Record<string, number[]> = {
+    rules: [], fptm: [], ai: [],
+  };
 
   private encodeLeadFeatures(lead: typeof leads.$inferSelect, stageIdx: number): Uint8Array {
     const x = new Uint8Array(FEATURES.length);
@@ -31,7 +35,7 @@ class LeadFptmScoring {
     if (lead.comment) x[2] = 1;
     if (lead.region) x[3] = 1;
     if (lead.pdConsent) x[4] = 1;
-    if (lead.assignedUserId || lead.assignedRealtorId) x[5] = 1;
+    if (lead.assignedUserId || lead.assignedDealManagerId) x[5] = 1;
     if ((lead.watchers?.length ?? 0) > 0) x[6] = 1;
     if (lead.source === "form") x[7] = 1;
     else if (lead.source === "api") x[8] = 1;
@@ -90,10 +94,51 @@ class LeadFptmScoring {
     const toIdx = this.stageOrder.indexOf(toStageId);
     const fromIdx = this.stageOrder.indexOf(lead.statusId ?? "");
     if (toIdx < 0 || fromIdx < 0) return null;
+    const pred = this.predict(lead);
+    if (pred) {
+      const err = pred.predictedClass === toIdx ? 0 : 1;
+      this.pushError("fptm", err);
+    }
     const x = this.encodeLeadFeatures({ ...lead, statusId: toStageId }, toIdx);
     const y = Math.min(toIdx, 7);
     this.fptm.fit([x], [y], 1);
     return this.predict({ ...lead, statusId: toStageId });
+  }
+
+  private pushError(channel: string, err: number) {
+    const arr = this.signalErrors[channel] ?? [];
+    arr.push(err);
+    if (arr.length > 32) arr.shift();
+    this.signalErrors[channel] = arr;
+  }
+
+  /** Precision weight: w_i ∝ 1/var(error_i); guard ≥66% real signal via min samples */
+  precisionWeights(): Record<string, number> {
+    const weights: Record<string, number> = {};
+    let total = 0;
+    for (const [ch, errs] of Object.entries(this.signalErrors)) {
+      if (errs.length < 5) {
+        weights[ch] = 1;
+        total += 1;
+        continue;
+      }
+      const mean = errs.reduce((a, b) => a + b, 0) / errs.length;
+      const variance = errs.reduce((a, e) => a + (e - mean) ** 2, 0) / errs.length;
+      const w = 1 / Math.max(variance, 0.01);
+      weights[ch] = w;
+      total += w;
+    }
+    if (total <= 0) return { rules: 0.34, fptm: 0.33, ai: 0.33 };
+    for (const k of Object.keys(weights)) weights[k]! /= total;
+    return weights;
+  }
+
+  ensembleScore(lead: typeof leads.$inferSelect, ruleScore: number, aiScore?: number): number {
+    const fptmPred = this.predict(lead);
+    const fptmScore = fptmPred ? fptmPred.probabilities[fptmPred.predictedClass] ?? 0.5 : 0.5;
+    const w = this.precisionWeights();
+    const ai = aiScore ?? 0.5;
+    return w.rules! * ruleScore + w.fptm! * fptmScore + w.ai! * ai;
   }
 }
 

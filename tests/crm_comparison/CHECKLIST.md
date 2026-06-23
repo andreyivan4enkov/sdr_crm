@@ -1,4 +1,4 @@
-# Чеклист: Classic CRM vs SDR CRM
+# Чеклист: Classic CRM vs Advanced bench
 
 Отмечайте `[x]` по мере выполнения. Итоговый статус дублируется в `logs/comparison.log`.
 
@@ -11,24 +11,24 @@
 
 ## Фаза 1 — Память и поиск (MEM)
 
-- [x] **CMP-MEM-01** Классика: точный поиск / LIKE vs SDR: SDM Hamming recall
-- [x] **CMP-MEM-02** Классика: 0% fuzzy при 28% шума vs SDR: ≥99% recall
-- [x] **CMP-MEM-03** Классика: JSONB + 10 полей vs SDR: VSA bind/unbind
-- [x] **CMP-MEM-04** Классика: SQL 5-hop JOIN vs SDR: VaCoAl multi-hop
+- [x] **CMP-MEM-01** Классика: точный поиск / LIKE vs Bench: SDM Hamming recall
+- [x] **CMP-MEM-02** Классика: 0% fuzzy при 28% шума vs Bench: ≥99% recall
+- [x] **CMP-MEM-03** Классика: JSONB + 10 полей vs Bench: VSA bind/unbind
+- [x] **CMP-MEM-04** Классика: SQL 5-hop JOIN vs Bench: VaCoAl multi-hop
 
 ## Фаза 2 — Классификация и инференс (TM)
 
-- [x] **CMP-TM-01** Классика: rule-based automations vs SDR: FPTM accuracy
-- [x] **CMP-TM-02** Классика: SQL/JS filter loop vs SDR: битовый инференс (ops/s)
-- [x] **CMP-TM-03** Классика: непрозрачные automations vs SDR: DNF IF/THEN
-- [x] **CMP-TM-04** Классика: полный сброс правил vs SDR: Recognize-and-Erase drift
+- [x] **CMP-TM-01** Классика: rule-based automations vs Bench: FPTM accuracy
+- [x] **CMP-TM-02** Классика: SQL/JS filter loop vs Bench: битовый инференс (ops/s)
+- [x] **CMP-TM-03** Классика: непрозрачные automations vs Bench: DNF IF/THEN
+- [x] **CMP-TM-04** Классика: полный сброс правил vs Bench: Recognize-and-Erase drift
 
 ## Фаза 3 — Безопасность и динамика (AI)
 
-- [x] **CMP-AI-01** Классика: RBAC-only audit vs SDR: surprisal anomaly
-- [x] **CMP-AI-02** Классика: CSPRNG only vs SDR: hardware entropy cascade
-- [x] **CMP-AI-03** Классика: нет IPC vs SDR: NativeIPCBridge контракт
-- [x] **CMP-AI-04** Классика: SQL funnel COUNT vs SDR: CA Rule 184 + LST
+- [x] **CMP-AI-01** Классика: RBAC-only audit vs Bench: surprisal anomaly
+- [x] **CMP-AI-02** Классика: CSPRNG only vs Bench: hardware entropy cascade
+- [x] **CMP-AI-03** Классика: нет IPC vs Bench: NativeIPCBridge контракт
+- [x] **CMP-AI-04** Классика: SQL funnel COUNT vs Bench: CA Rule 184 + LST
 
 ## Фаза 4 — Серверные и CRM-стандарты
 
@@ -40,10 +40,10 @@
 
 ## Фаза 5 — Отчёт
 
-- [x] Сводная таблица Classic / SDR / Industry
+- [x] Сводная таблица Classic / Bench / Industry
 - [x] Вердикт по каждой оси (win/loss/parity/gap)
-- [x] Матрица «production gap» (что есть в SDR CRM classic, чего нет в API)
-- [x] Рекомендации интеграции SDR в `server/`
+- [x] Матрица «production gap» (что есть в CRM classic, чего нет в API)
+- [x] Рекомендации интеграции bench в `server/`
 
 ## Фаза 6 — Стресс-тест (`stress-bench.ts`)
 

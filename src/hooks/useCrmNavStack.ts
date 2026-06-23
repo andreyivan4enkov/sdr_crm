@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { CrmNavFrame } from "../lib/crm-nav-stack";
+import { buildCrmSearch } from "../lib/crm-route";
 import { shouldPushNav } from "../lib/crm-nav-stack";
 
 type Args = {
@@ -45,7 +46,13 @@ export function useCrmNavStack({
     setTaskFocusId(frame.taskId ?? null);
     if (frame.crmSub && setCrmSub) setCrmSub(frame.crmSub);
     if (setSettingsTab) setSettingsTab(frame.settingsTab as never);
-    navigate("/crm");
+    navigate(`/crm?${buildCrmSearch({
+      view: frame.view,
+      lead: frame.leadId ?? undefined,
+      task: frame.taskId ?? undefined,
+      sub: frame.crmSub,
+      settings: frame.settingsTab,
+    })}`);
   }, [setCrmView, setSelectedId, setTaskFocusId, setCrmSub, setSettingsTab, navigate]);
 
   const clearStack = useCallback(() => {

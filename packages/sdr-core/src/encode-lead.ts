@@ -57,7 +57,7 @@ function mergeSdrVectors(parts: Uint8Array[], cfg: SdrCfg): Uint8Array {
   return out;
 }
 
-/** Детерминированный SDR из полей лида (name, phone, email, …). */
+/** Детерминированный вектор из полей лида (name, phone, email, …). */
 export function encodeLeadSdr(lead: LeadEncodeInput, cfg: SdrCfg = DEFAULT_LEAD_SDR_CFG): Uint8Array {
   const parts: Uint8Array[] = [];
   if (lead.name) parts.push(hashSelectBits(lead.name, cfg, "name"));
@@ -69,7 +69,7 @@ export function encodeLeadSdr(lead: LeadEncodeInput, cfg: SdrCfg = DEFAULT_LEAD_
   return mergeSdrVectors(parts, cfg);
 }
 
-/** SDR для поискового запроса (?search=). */
+/** Вектор для поискового запроса (?search=). */
 export function encodeQuery(query: string, cfg: SdrCfg = DEFAULT_LEAD_SDR_CFG): Uint8Array {
   const q = query.trim();
   if (!q) return new Uint8Array(cfg.dimensions);

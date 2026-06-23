@@ -1,21 +1,25 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { ChevronDown, Plus, Search } from "lucide-react";
 import type { TeamMember } from "@sdr-crm/api-client";
+import { AnchoredPopover } from "./AnchoredPopover";
 import { EmployeeAvatar, EmployeeChip } from "./EmployeeChip";
+import { useUiT } from "../lib/i18n-labels";
 
 export function BioGlassAddButton({
   onClick,
-  title = "Добавить",
+  title,
 }: {
   onClick: () => void;
   title?: string;
 }) {
+  const { tr } = useUiT();
+  const label = title ?? tr("add", undefined, "common");
   return (
     <button
       type="button"
       onClick={onClick}
-      title={title}
-      aria-label={title}
+      title={label}
+      aria-label={label}
       className="bio-glass-add shrink-0 text-teal-600 hover:text-teal-500 hover:scale-105 active:scale-95 transition-transform"
     >
       <Plus className="w-5 h-5" strokeWidth={2.25} />
@@ -26,22 +30,29 @@ export function BioGlassAddButton({
 function AssignPopover({
   t,
   pool,
+  anchor,
+  open,
   onPick,
   onClose,
 }: {
   t: Record<string, string>;
   pool: TeamMember[];
+  anchor: HTMLElement | null;
+  open: boolean;
   onPick: (id: string) => void;
   onClose: () => void;
 }) {
+  const { tr } = useUiT();
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const filtered = pool.filter((m) => !q || m.name.toLowerCase().includes(q));
 
   return (
-    <div
-      className={`absolute z-30 top-full left-0 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-2xl bio-card p-2 shadow-xl ${t.surface}`}
-      onClick={(e) => e.stopPropagation()}
+    <AnchoredPopover
+      anchor={anchor}
+      open={open}
+      onClose={onClose}
+      className={`w-[min(18rem,calc(100vw-2rem))] rounded-2xl bio-card p-2 shadow-xl ${t.surface}`}
     >
       <div className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 ${t.border}`}>
         <Search className={`w-3.5 h-3.5 shrink-0 ${t.muted}`} />
@@ -49,14 +60,14 @@ function AssignPopover({
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Поиск сотрудника…"
+          placeholder={tr("searchEmployee", undefined, "crm")}
           className={`w-full bg-transparent text-sm outline-none ${t.subtle}`}
         />
       </div>
       <div className="mt-1.5 max-h-48 overflow-y-auto nice-scroll space-y-0.5">
         {filtered.length === 0 && (
           <p className={`px-2 py-3 text-xs text-center ${t.muted}`}>
-            {pool.length === 0 ? "Нет доступных сотрудников" : "Никого не найдено"}
+            {pool.length === 0 ? tr("noEmployees", undefined, "crm") : tr("noEmployeeFound", undefined, "crm")}
           </p>
         )}
         {filtered.map((m) => (
@@ -76,7 +87,7 @@ function AssignPopover({
           </button>
         ))}
       </div>
-    </div>
+    </AnchoredPopover>
   );
 }
 
@@ -103,19 +114,11 @@ export function LeadAssignSection({
   onAdd?: (id: string) => void;
   onRemove?: (id: string) => void;
 }) {
+  const { tr } = useUiT();
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const assignedIds = new Set(assignedMembers.map((m) => m.id));
   const available = pickPool.filter((m) => !assignedIds.has(m.id));
-
-  useEffect(() => {
-    if (!open) return;
-    function onDoc(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
 
   return (
     <div className="min-w-0 flex-1">
@@ -148,29 +151,29 @@ export function LeadAssignSection({
         )}
 
         {assignedMembers.length === 0 && !editable && (
-          <p className={`text-xs ${t.muted}`}>{multiple ? "Нет наблюдателей" : "Не назначен"}</p>
+          <p className={`text-xs ${t.muted}`}>{multiple ? tr("noWatchers", undefined, "crm") : tr("noAssignee", undefined, "crm")}</p>
         )}
 
         {editable && onAdd && (
-          <div className="relative" ref={wrapRef}>
+          <div ref={setAnchorEl}>
             <BioGlassAddButton
               title={
                 multiple
-                  ? "Добавить наблюдателя"
+                  ? tr("addWatcher", undefined, "crm")
                   : assignedMembers.length
-                    ? "Сменить ответственного"
-                    : "Назначить ответственного"
+                    ? tr("changeAssignee", undefined, "crm")
+                    : tr("assignAssignee", undefined, "crm")
               }
               onClick={() => setOpen((o) => !o)}
             />
-            {open && (
-              <AssignPopover
-                t={t}
-                pool={available}
-                onPick={onAdd}
-                onClose={() => setOpen(false)}
-              />
-            )}
+            <AssignPopover
+              t={t}
+              pool={available}
+              anchor={anchorEl}
+              open={open}
+              onPick={onAdd}
+              onClose={() => setOpen(false)}
+            />
           </div>
         )}
       </div>
@@ -187,6 +190,7 @@ export function LeadResponsibleCard({
   member?: TeamMember | null;
   onClear?: () => void;
 }) {
+  const { tr } = useUiT();
   if (!member) return null;
   return (
     <div className={`inline-flex items-center gap-2.5 rounded-2xl border px-3 py-2 bio-card ${t.border}`}>
@@ -201,7 +205,7 @@ export function LeadResponsibleCard({
       </div>
       {onClear && (
         <button type="button" onClick={onClear} className={`text-xs ${t.muted} hover:text-rose-500 shrink-0`}>
-          Снять
+          {tr("removeAssignee", undefined, "crm")}
         </button>
       )}
     </div>
@@ -220,40 +224,32 @@ export function GlassAssigneeChip({
   pool: TeamMember[];
   onChange: (id: string) => void;
 }) {
+  const { tr } = useUiT();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function onDoc(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
-
-  const label = member?.name?.split(/\s+/)[0] || "Кто";
+  const label = member?.name?.split(/\s+/)[0] || tr("who", undefined, "crm");
 
   return (
-    <div className="relative shrink-0" ref={ref}>
+    <div className="shrink-0" ref={setAnchorEl}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        title={member ? `Исполнитель: ${member.name}` : "Выбрать исполнителя"}
+        title={member ? tr("assigneeTitle", { name: member.name }, "crm") : tr("selectAssignee", undefined, "crm")}
         className={`bio-glass-chip inline-flex items-center gap-1.5 pl-1 pr-2 py-1 transition hover:border-teal-400/40 ${open ? "border-teal-400/50 ring-2 ring-teal-500/15" : ""}`}
       >
         <EmployeeAvatar member={member} size="xs" />
         <span className={`text-xs font-medium max-w-[4.25rem] truncate crm-data ${t.text}`}>{label}</span>
         <ChevronDown className={`w-3 h-3 shrink-0 opacity-50 transition ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <AssignPopover
-          t={t}
-          pool={pool}
-          onPick={(id) => { onChange(id); setOpen(false); }}
-          onClose={() => setOpen(false)}
-        />
-      )}
+      <AssignPopover
+        t={t}
+        pool={pool}
+        anchor={anchorEl}
+        open={open}
+        onPick={(id) => { onChange(id); setOpen(false); }}
+        onClose={() => setOpen(false)}
+      />
     </div>
   );
 }

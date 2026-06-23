@@ -1,21 +1,38 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { storageGet, storageSet } from "./storage";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { useCrmData, persistLeadUpdate, persistNewLead, persistStages, persistPipelines, persistFields, persistCardLayout, persistChannels } from "./hooks/useCrmData";
+import { useCrmData, persistFields, persistCardLayout, persistLeadCardBlocks } from "./hooks/useCrmData";
+import { LeadCardSectionLayout } from "./components/LeadCardSectionLayout";
+import { normalizeLeadCardBlocks, type LeadCardBlock } from "./lib/lead-card-blocks";
+import { useCrmMutations } from "./features/crm/useCrmMutations";
+import { LoginPage } from "./features/crm/LoginPage";
 import { useLeadFieldDraft } from "./hooks/useLeadFieldDraft";
+import { CrmFieldInput } from "./components/CrmFieldInput";
+import { isFieldRequired } from "./lib/crm-field-types";
 import { formatPhoneInput, formatPhoneDisplay, isValidRuPhone, PHONE_FORMAT_HINT } from "./lib/phone";
 import { useCrmNavStack } from "./hooks/useCrmNavStack";
 import { useIsMobile } from "./hooks/useMediaQuery";
 import { useSwipeBack } from "./hooks/useSwipeBack";
 import { useSse } from "./hooks/useSse";
 import { useAutoRefresh } from "./hooks/useAutoRefresh";
+import { popAndUndo } from "./hooks/useUndoStack";
 import { api, hasPermission, normalizeLead, canEditLead, canAssignLead } from "./api/client";
 import { RegisterPage } from "./views/RegisterPage";
 import { PrivacyPage } from "./views/PrivacyPage";
+import { KanbanBoard as Kanban } from "./views/KanbanBoard";
+import { NetworkBanner } from "./components/NetworkBanner";
+import { CrmErrorBoundary } from "./components/CrmErrorBoundary";
+import { CrmSkeleton } from "./components/CrmSkeleton";
 import { AdminAudit } from "./views/admin/AdminAudit";
 import { SettingsHub, canAccessSettings } from "./views/SettingsHub";
-import { AnalyticsPage } from "./views/AnalyticsPage";
+import { ProfileHub, type ProfileTab } from "./views/ProfileHub";
+import { type ReactorTab } from "./views/reactor/ReactorUnifiedHub";
+import { ReactorShell } from "./views/reactor/ReactorShell";
+import { FaceProductShell } from "./components/face/FaceProductShell";
+import { FaceRuntimeProvider, type FaceRuntimeContextValue } from "./components/face/FaceRuntimeContext";
+import { canAccessReactor } from "./lib/crm-nav";
+import { AnalyticsHub } from "./views/analytics/AnalyticsHub";
 import { TasksPage, LeadTasksBlock } from "./views/TasksPage";
 import { CallsPage, LeadCallHistory } from "./components/LeadCallHistory";
 import { MobileCrmNav } from "./components/MobileCrmNav";
@@ -32,16 +49,25 @@ import { GlassDatePicker, GlassDateTimePicker, GlassPreferredTimePicker, formatP
 import { EmployeeAvatar, EmployeeChip } from "./components/EmployeeChip";
 import { leadResponsibleMember, uniqueWatcherMembers } from "./lib/team-members";
 import { TeamPage } from "./views/TeamPage";
+import { EdoHub, LeadDocumentsPanel } from "./views/edo/EdoHub";
+import { MailHub, LeadMailPanel } from "./views/mail/MailHub";
+import { CrmEntitiesHub, LeadEntitiesPanel } from "./views/entities/CrmEntitiesHub";
+import { ResourcesHub, LeadResourcesPanel } from "./views/resources/ResourcesHub";
+import { PipelineMapView } from "./views/blueprint/PipelineMapView";
 import { topBarBg } from "./theme";
 import { ThemeProvider, useTheme } from "./context/ThemeProvider";
+import { skinBtn, isNeoTheme } from "./lib/neo-ui";
 import { SequencerMode } from "./views/SequencerMode";
-import { buildCrmNav, CRM_NAV_LABELS, NAV_LAYOUT_KEY, type NavLayout } from "./lib/crm-nav";
+import { useCrmNavPrefs } from "./hooks/useCrmNavPrefs";
+import { navLabel, NAV_LAYOUT_KEY, type NavLayout } from "./lib/crm-nav";
+import { useUiT } from "./lib/i18n-labels";
 import {
   getStoredPipelineId, setStoredPipelineId, resolveActivePipeline,
   stagesForPipeline, leadsForPipeline,
 } from "./lib/crm-pipelines";
+import { buildCrmSearch, crmSearchEqual, parseCrmSearch } from "./lib/crm-route";
 import {
-  STAGE_COLORS, harmonyHint, recommendStageColor, stageHex, stagePillStyle, statusContourStyle,
+  STAGE_COLORS, harmonyHint, recommendStageColor, stageHex, stagePillStyle, entityCardAccentVars,
   stagePipelineStyle, bioNoteStyle,
 } from "./lib/stage-colors";
 import {
@@ -50,7 +76,7 @@ import {
   PhoneCall, Sun, Moon, Bell, Columns, Tag, Type, Hash, Banknote, MapPinned,
   CalendarClock, Calendar, User, Zap, Plug, GripVertical, ListTodo, Check, Pencil, Globe, Eye,
   Megaphone, MessageCircle, Link2, Settings, List, BarChart3, SlidersHorizontal, ExternalLink,
-  ScrollText, Eraser, Download, PanelLeft, Menu, GitBranch, ArrowRightLeft, Copy, Mail, Radar, QrCode,
+  ScrollText, Eraser, Download, PanelLeft, Menu, GitBranch, ArrowRightLeft, Copy, Mail, Radar, QrCode, Cpu,
 } from "lucide-react";
 
 const now = () => new Date().toISOString();
@@ -94,44 +120,96 @@ export default function App() {
 
 function AppShell() {
   const { user, loading: authLoading, logout } = useAuth();
+  const { tr, locale } = useUiT();
   const location = useLocation();
   const navigate = useNavigate();
+  const initialRoute = useMemo(() => parseCrmSearch(location.search), []);
   const mode = location.pathname.startsWith("/crm") ? "crm" : "auth";
-  const { data, loading: dataLoading, reload, reloadSilent, updateData, setData } = useCrmData(!!user);
+  const { data, loading: dataLoading, loadError: dataLoadError, reload, reloadSilent, updateData, setData } = useCrmData(!!user);
   const { theme, tokens: t, setColorMode, toggleBrand } = useTheme();
   const [sequencerOpen, setSequencerOpen] = useState(false);
   const [qrShareOpen, setQrShareOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [scrolled, setScrolled] = useState(false);
-  const [crmView, setCrmView] = useState("crm");
-  const [crmSub, setCrmSub] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches ? "list" : "kanban",
+  const [crmView, setCrmView] = useState(initialRoute.view || "crm");
+  const [crmSub, setCrmSub] = useState<"kanban" | "list">(() =>
+    initialRoute.sub
+    ?? (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches ? "list" : "kanban"),
   );
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialRoute.lead ?? null);
   const [settingsMode, setSettingsMode] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"profile" | "pipelines" | "fields" | "channels" | "roles" | "notifications" | "security" | "backup" | undefined>();
-  const [taskFocusId, setTaskFocusId] = useState<string | null>(null);
+  const [settingsTab, setSettingsTab] = useState<string | undefined>(
+    initialRoute.settings,
+  );
+  const [profileTab, setProfileTab] = useState<ProfileTab | undefined>(initialRoute.profile as ProfileTab | undefined);
+  const [reactorTab, setReactorTab] = useState<ReactorTab | undefined>(initialRoute.reactor);
+  const [blueprintCtx, setBlueprintCtx] = useState<{ stageId?: string; pipelineId?: string; reactionId?: string; siteId?: string } | null>(() =>
+    (initialRoute.stage || initialRoute.pipeline || initialRoute.reaction || initialRoute.site)
+      ? {
+        stageId: initialRoute.stage,
+        pipelineId: initialRoute.pipeline,
+        reactionId: initialRoute.reaction,
+        siteId: initialRoute.site,
+      }
+      : null,
+  );
+  const [taskFocusId, setTaskFocusId] = useState<string | null>(initialRoute.task ?? null);
   const [navLayout, setNavLayout] = useState<NavLayout>("horizontal");
   const [navDrawerOpen, setNavDrawerOpen] = useState(false);
+  const [peekLeadId, setPeekLeadId] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const taskId = params.get("task");
-    const leadId = params.get("lead");
-    if (taskId) {
-      setCrmView("tasks");
-      setTaskFocusId(taskId);
+    const parsed = parseCrmSearch(location.search);
+    if (parsed.view) setCrmView(parsed.view);
+    if (parsed.sub) setCrmSub(parsed.sub);
+    if (parsed.lead) {
+      setSelectedId(parsed.lead);
+      setTaskFocusId(null);
+    } else if (parsed.task) {
+      setTaskFocusId(parsed.task);
+      setSelectedId(null);
+    } else if (!parsed.lead && !parsed.task && parsed.view && parsed.view !== "crm") {
+      setSelectedId(null);
+      setTaskFocusId(null);
     }
-    if (leadId) {
-      setCrmView("crm");
-      setSelectedId(leadId);
+    if (parsed.settings) setSettingsTab(parsed.settings as typeof settingsTab);
+    if (parsed.profile) setProfileTab(parsed.profile as ProfileTab);
+    if (parsed.reactor) setReactorTab(parsed.reactor);
+    if (parsed.stage || parsed.pipeline || parsed.reaction || parsed.site) {
+      setBlueprintCtx({
+        stageId: parsed.stage,
+        pipelineId: parsed.pipeline,
+        reactionId: parsed.reaction,
+        siteId: parsed.site,
+      });
     }
   }, [location.search]);
 
-  function goCrmView(v: string, tab?: typeof settingsTab) {
+  useEffect(() => {
+    if (!location.pathname.startsWith("/crm")) return;
+    const next = buildCrmSearch({
+      view: crmView,
+      lead: crmView === "crm" ? (selectedId ?? undefined) : undefined,
+      task: crmView === "tasks" ? (taskFocusId ?? undefined) : undefined,
+      sub: crmView === "crm" && !selectedId ? crmSub : undefined,
+      settings: crmView === "settings" ? settingsTab : undefined,
+      profile: crmView === "profile" ? profileTab : undefined,
+      reactor: crmView === "reactor" ? reactorTab : undefined,
+      pipeline: crmView === "reactor" ? blueprintCtx?.pipelineId : undefined,
+      stage: crmView === "reactor" ? blueprintCtx?.stageId : undefined,
+      reaction: crmView === "reactor" && reactorTab === "blueprint" ? blueprintCtx?.reactionId : undefined,
+      site: crmView === "reactor" && reactorTab === "site" ? blueprintCtx?.siteId : undefined,
+    });
+    if (!crmSearchEqual(location.search, next)) {
+      navigate({ pathname: "/crm", search: next }, { replace: true });
+    }
+  }, [crmView, selectedId, taskFocusId, crmSub, settingsTab, profileTab, reactorTab, blueprintCtx, location.pathname, location.search, navigate]);
+
+  function goCrmView(v: string, tab?: string) {
     if (v === "users") v = "team";
+    if (v === "assets") v = "resources";
     navStack.clearStack();
     if (v === "integrations" || v === "channels") {
       setCrmView("settings");
@@ -139,12 +217,30 @@ function AppShell() {
     } else if (v === "roles") {
       setCrmView("settings");
       setSettingsTab("roles");
+    } else if (v === "profile") {
+      setCrmView("profile");
+      setProfileTab(tab as ProfileTab | undefined);
+      setSettingsTab(undefined);
+      setReactorTab(undefined);
+    } else if (v === "reactor") {
+      setCrmView("reactor");
+      const reactorModule = (tab === "pipelines" || tab === "pipeline" ? "blueprint" : tab) as ReactorTab | undefined;
+      setReactorTab(reactorModule ?? "blueprint");
+      setSettingsTab(undefined);
+      setProfileTab(undefined);
+      if (tab) {
+        setBlueprintCtx((ctx) => ({ ...ctx, pipelineId: ctx?.pipelineId, stageId: ctx?.stageId }));
+      }
     } else if (v === "settings") {
       setCrmView("settings");
-      setSettingsTab(tab);
+      setSettingsTab(tab as typeof settingsTab);
+      setProfileTab(undefined);
+      setReactorTab(undefined);
     } else {
       setCrmView(v);
       setSettingsTab(undefined);
+      setProfileTab(undefined);
+      setReactorTab(undefined);
     }
     setSelectedId(null);
     setTaskFocusId(null);
@@ -168,7 +264,7 @@ function AppShell() {
     if (layout === "horizontal") setNavDrawerOpen(false);
   }
 
-  const crmNav = useMemo(() => buildCrmNav(user), [user]);
+  const { crmNav, products: reactorProducts } = useCrmNavPrefs(user);
 
   useSse(!!user, (event, payload) => {
     if (event === "notification") {
@@ -178,13 +274,13 @@ function AppShell() {
     }
     if (event === "incoming_call") {
       const p = payload as { phone: string; lead?: { name: string; id?: string }; event?: string };
-      const label = p.event === "outgoing_call" ? "Исходящий" : "Входящий";
+      const label = p.event === "outgoing_call" ? tr("outgoingCall", undefined, "crm") : tr("incomingCall", undefined, "crm");
       notify(`${label} звонок: ${p.phone}${p.lead ? ` (${p.lead.name})` : ""}`, p.lead?.id);
       window.dispatchEvent(new Event("crm:calls-refresh"));
     }
     if (event === "call_transcript") {
       const p = payload as { call?: { phone: string }; leadId?: string };
-      notify(`Расшифровка готова: ${p.call?.phone || "звонок"}`, p.leadId);
+      notify(tr("transcriptionReady", { phone: p.call?.phone || "—" }, "crm"), p.leadId);
       window.dispatchEvent(new Event("crm:calls-refresh"));
       void reloadSilent();
     }
@@ -217,7 +313,41 @@ function AppShell() {
     }
   });
 
+  const onReactorBindingChange = useCallback((b: {
+    module?: import("./views/reactor/ReactorUnifiedHub").ReactorTab;
+    pipelineId?: string;
+    stageId?: string;
+    blueprintId?: string;
+    siteId?: string;
+  }) => {
+    setReactorTab(b.module);
+    setBlueprintCtx({
+      pipelineId: b.pipelineId,
+      stageId: b.stageId,
+      reactionId: b.blueprintId,
+      siteId: b.siteId,
+    });
+  }, []);
+
   useAutoRefresh(!!user && location.pathname.startsWith("/crm"), reloadSilent);
+
+  useEffect(() => {
+    const onPeek = (e: Event) => setPeekLeadId((e as CustomEvent<{ id: string }>).detail.id);
+    window.addEventListener("crm:peek-lead", onPeek);
+    return () => window.removeEventListener("crm:peek-lead", onPeek);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        const label = popAndUndo();
+        if (label) notify(`Отменено: ${label}`);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const navStack = useCrmNavStack({
     crmView,
@@ -244,69 +374,9 @@ function AppShell() {
   function openLead(leadId: string) { navStack.navigateToLead(leadId); }
   function openTask(taskId: string) { navStack.navigateToTask(taskId); }
 
-  async function addLead(input, source, channelId) {
-    const siteCh = data?.channels.find((c) => c.name === "Форма на сайте") || data?.channels[0];
-    const lead = await persistNewLead({
-      ...input, source, channelId: channelId || siteCh?.id,
-      createdBy: source === "form" ? "Форма с лендинга" : `Звонок 8-800 (${user?.name || ""})`,
-    });
-    setData((d) => d ? { ...d, leads: [lead, ...d.leads] } : d);
-  }
-  async function moveLead(leadId, stageId) {
-    let rollback;
-    setData((d) => {
-      if (!d) return d;
-      rollback = d.leads.find((l) => l.id === leadId);
-      return {
-        ...d,
-        leads: d.leads.map((l) => (l.id === leadId ? { ...l, status: stageId } : l)),
-      };
-    });
-    try {
-      const lead = await persistLeadUpdate(leadId, { statusId: stageId });
-      setData((d) => d ? { ...d, leads: d.leads.map((l) => l.id === leadId ? lead : l) } : d);
-    } catch (e) {
-      if (rollback) {
-        const prev = rollback;
-        setData((d) => d ? { ...d, leads: d.leads.map((l) => (l.id === leadId ? prev : l)) } : d);
-      } else {
-        void reloadSilent();
-      }
-      throw e;
-    }
-  }
-  async function updateLead(id, patch) {
-    const apiPatch = { ...patch };
-    if (patch.status) { apiPatch.statusId = patch.status; delete apiPatch.status; }
-    try {
-      const lead = await persistLeadUpdate(id, apiPatch);
-      setData((d) => d ? { ...d, leads: d.leads.map((l) => l.id === id ? lead : l) } : d);
-      return lead;
-    } catch (e) {
-      pushToast((e as Error).message || "Не удалось сохранить изменения");
-      throw e;
-    }
-  }
-  async function addNote(id, text) {
-    await api.addNote(id, text);
-    reload();
-  }
-  async function updateDataAsync(patch) {
-    if (patch.pipelines) { const p = await persistPipelines(patch.pipelines); updateData({ pipelines: p }); return; }
-    if (patch.stages) { const s = await persistStages(patch.stages); updateData({ stages: s }); return; }
-    if (patch.fields) { const f = await persistFields(patch.fields); updateData({ fields: f }); return; }
-    if (patch.channels) { const c = await persistChannels(patch.channels); updateData({ channels: c }); return; }
-    if (patch.tasks) {
-      updateData({ tasks: patch.tasks });
-      return;
-    }
-    if (patch.realtors) {
-      updateData(patch);
-      reload();
-      return;
-    }
-    updateData(patch);
-  }
+  const { addLead, moveLead, updateLead, addNote, updateDataAsync } = useCrmMutations({
+    data, setData, updateData, reload, reloadSilent, pushToast, user,
+  });
 
   const scrollCss = `
     .nice-scroll::-webkit-scrollbar{height:10px;width:10px}
@@ -316,11 +386,12 @@ function AppShell() {
     .nice-scroll{scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.4) transparent}
   `;
 
-  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-stone-50 text-slate-400 text-sm">Загрузка…</div>;
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 text-sm" data-color-mode="light">{tr("loading", undefined, "common")}</div>;
 
   return (
     <div data-crm-app data-brand={theme.brandOn ? "true" : undefined} data-color-mode={theme.colorMode} data-ui-skin={theme.uiSkin} className={`min-h-screen transition-colors duration-300 overflow-x-hidden max-w-full ${t.app} ${t.text}`}>
       <style>{scrollCss}</style>
+      <NetworkBanner />
       <TopBar t={t} theme={theme} scrolled={scrolled} mode={mode} user={user}
         onLogout={async () => { await logout(); navigate("/login"); }}
         setColorMode={setColorMode} toggleBrand={toggleBrand} notifs={notifs} setNotifs={setNotifs} openLead={openLead} openTask={openTask}
@@ -334,24 +405,55 @@ function AppShell() {
       <Routes>
         <Route path="/" element={user ? <Navigate to="/crm" replace /> : <Navigate to="/login" replace />} />
         <Route path="/privacy" element={<PrivacyPage t={t} />} />
-        <Route path="/login" element={user ? <Navigate to="/crm" replace /> : <Login t={t} onSuccess={() => navigate("/crm")} />} />
+        <Route path="/login" element={user ? <Navigate to="/crm" replace /> : <LoginPage t={t} Btn={Btn} TInput={TInput} Labeled={Labeled} onSuccess={() => navigate("/crm")} />} />
         <Route path="/auth/qr" element={<AuthQrPage t={t} />} />
         <Route path="/register" element={<RegisterPage t={t} Btn={Btn} TInput={TInput} Labeled={Labeled} />} />
         <Route path="/crm" element={
           user ? (
-            dataLoading && !data ? <div className={`p-8 text-center text-sm text-slate-400 ${navLayout === "vertical" ? "pb-8" : "pb-24 md:pb-8"}`}>Загрузка CRM…</div>
-              : !data ? <div className={`p-8 text-center text-sm text-rose-500 ${navLayout === "vertical" ? "pb-8" : "pb-24 md:pb-8"}`}>Не удалось загрузить данные. <button type="button" className="underline ml-1" onClick={() => reload()}>Повторить</button></div>
+            dataLoading && !data ? <CrmSkeleton />
+              : !data ? <div className={`p-8 text-center text-sm text-rose-500 ${navLayout === "vertical" ? "pb-8" : "pb-24 md:pb-8"}`}>
+                {dataLoadError || tr("loadDataFailed", undefined, "crm")}
+                {/повреждена|dev:recover/i.test(dataLoadError) && (
+                  <span className="block mt-2 text-slate-500 text-xs">
+                    {tr("recoverHint", undefined, "crm")}
+                  </span>
+                )}
+                <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
+                  {/повреждена|dev:recover/i.test(dataLoadError) && (
+                    <button
+                      type="button"
+                      className="text-sm px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700"
+                      onClick={async () => {
+                        try {
+                          await api.recoverDevDatabase();
+                          reload();
+                        } catch {
+                          reload();
+                        }
+                      }}
+                    >
+                      {tr("recoverDb", undefined, "crm")}
+                    </button>
+                  )}
+                  <button type="button" className="text-sm underline" onClick={() => reload()}>{tr("retry", undefined, "common")}</button>
+                </div>
+              </div>
               : <div className={`flex flex-col min-h-[calc(100dvh-var(--crm-header-h)-var(--crm-mobile-nav-h))] md:min-h-[calc(100dvh-6.25rem)] w-full min-w-0 max-w-full overflow-x-hidden ${
                   navLayout === "vertical" ? "md:pl-56 pb-0" : "pb-[calc(var(--crm-mobile-nav-h)+env(safe-area-inset-bottom))] md:pb-0"
-                }`}><Crm t={t} user={user} data={data}
+                }`}><CrmErrorBoundary label={tr("crmError", undefined, "crm")}><Crm t={t} user={user} data={data}
                 crmView={crmView} crmSub={crmSub} setCrmSub={setCrmSub}
                 selectedId={selectedId} setSelectedId={setSelectedId}
                 settingsMode={settingsMode} setSettingsMode={setSettingsMode}
                 moveLead={moveLead} updateLead={updateLead} addNote={addNote} addLead={addLead}
-                updateData={updateDataAsync} reload={reload} settingsTab={settingsTab} goCrmView={goCrmView}
+                updateData={updateDataAsync} reload={reload} settingsTab={settingsTab}
+                profileTab={profileTab} reactorTab={reactorTab}
+                blueprintCtx={blueprintCtx} setBlueprintCtx={setBlueprintCtx} goCrmView={goCrmView}
+                onReactorBindingChange={onReactorBindingChange}
+                reactorProducts={reactorProducts}
                 taskFocusId={taskFocusId} setTaskFocusId={setTaskFocusId}
                 onOpenTask={openTask} onOpenLead={navStack.navigateToLead}
-                navigateBack={navStack.navigateBack} /></div>
+                onNotify={notify}
+                navigateBack={navStack.navigateBack} /></CrmErrorBoundary></div>
           ) : <Navigate to="/login" />
         } />
       </Routes>
@@ -361,8 +463,8 @@ function AppShell() {
         <>
           {navLayout === "horizontal" && (
             <>
-              <MobileCrmNav crmView={crmView} setCrmView={goCrmView} onMore={() => setMobileMoreOpen(true)} t={t} />
-              <MobileMoreSheet open={mobileMoreOpen} onClose={() => setMobileMoreOpen(false)} crmView={crmView} setCrmView={goCrmView} user={user} t={t} />
+              <MobileCrmNav crmView={crmView} setCrmView={goCrmView} nav={crmNav} onMore={() => setMobileMoreOpen(true)} t={t} />
+              <MobileMoreSheet open={mobileMoreOpen} onClose={() => setMobileMoreOpen(false)} crmView={crmView} setCrmView={goCrmView} nav={crmNav} t={t} />
             </>
           )}
           <CrmNavSidebar
@@ -401,24 +503,53 @@ function AppShell() {
           </div>
         ))}
       </div>
+
+      {peekLeadId && data && (() => {
+        const peekLead = data.leads.find((l) => l.id === peekLeadId);
+        if (!peekLead) return null;
+        return (
+          <div className="fixed inset-0 z-[200] flex items-stretch justify-end" onClick={(e) => { if (e.target === e.currentTarget) setPeekLeadId(null); }}>
+            <div className={`w-full max-w-xl flex flex-col shadow-2xl border-l overflow-hidden ${t.surface} ${t.border}`} style={{ backdropFilter: "blur(12px)" }} onClick={(e) => e.stopPropagation()}>
+              <LeadDetail
+                t={t} user={user} lead={peekLead} data={data}
+                onBack={() => setPeekLeadId(null)}
+                updateLead={updateLead} addNote={addNote} moveLead={moveLead}
+                reload={reload} updateData={updateDataAsync}
+                onOpenTask={openTask} onNotify={notify} goCrmView={goCrmView}
+              />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
 function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggleBrand, notifs, setNotifs, openLead, openTask, crmView, setCrmView, nav, navLayout, setNavLayout, onOpenNavDrawer, onOpenSequencer, onOpenQrShare, navigate }) {
+  const { tr, locale } = useUiT();
   const [bell, setBell] = useState(false);
+  const bellRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const unread = notifs.filter((n) => !n.read).length;
   const bg = topBarBg(theme, scrolled);
 
+  useEffect(() => {
+    if (!bell) return;
+    const onDown = (e: MouseEvent) => {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBell(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [bell]);
+
   return (
-    <div className={`fixed md:sticky top-0 inset-x-0 z-40 w-full max-w-full backdrop-blur-md border-b transition-all duration-300 overflow-hidden ${t.border} ${bg}`}>
+    <div className={`fixed md:sticky top-0 inset-x-0 z-40 w-full max-w-full backdrop-blur-md border-b transition-all duration-300 ${t.border} ${bg}`}>
       <div className="w-full max-w-full px-2 sm:px-3 md:px-4 min-h-12 md:min-h-14 py-1 flex items-center justify-between gap-1.5 min-w-0">
         <div className="flex items-center gap-1 shrink-0 min-w-0 overflow-hidden">
           {mode === "crm" && user && navLayout === "vertical" && (
             <button
               type="button"
-              title="Открыть меню"
+              title={tr("openMenu", undefined, "crm")}
               onClick={onOpenNavDrawer}
               className={`md:hidden w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition ${t.hover}`}
             >
@@ -427,23 +558,17 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
           )}
           <button
             type="button"
-            title="На главную CRM"
+            title={tr("goHomeCrm", undefined, "crm")}
             onClick={() => {
               if (mode === "crm" && user) setCrmView("crm");
               else navigate(user ? "/crm" : "/login");
             }}
             className="flex items-center gap-1.5 min-w-0 rounded-lg -ml-1 px-1 py-0.5 transition hover:opacity-90 active:scale-[0.98] overflow-hidden max-w-[52vw] sm:max-w-none"
           >
-            <img
-              src="/icons/logo-full.png"
-              alt="JB Realty"
-              className="h-8 sm:h-10 md:h-12 w-auto max-h-[2.5rem] sm:max-h-[3rem] object-contain object-center shrink-0 dark:brightness-0 dark:invert"
-              draggable={false}
-            />
-            <div className="flex items-baseline gap-1 min-w-0 overflow-hidden">
-              <span className="hidden sm:inline font-bold text-sm md:text-base tracking-tight truncate">SDR CRM</span>
+            <div className="flex items-baseline gap-1.5 min-w-0 overflow-hidden">
+              <span className="font-bold text-sm md:text-base tracking-tight truncate">CRM</span>
               <span className={`text-[10px] md:text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${t.chip}`}>
-                {isMobile && mode === "crm" ? (CRM_NAV_LABELS[crmView] || "CRM") : "CRM"}
+                {isMobile && mode === "crm" ? (navLabel(crmView, locale) || "CRM") : "CRM"}
               </span>
             </div>
           </button>
@@ -452,7 +577,7 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
           {mode === "crm" && user && (
             <button
               type="button"
-              title="QR-код для входа на телефоне"
+              title={tr("qrLoginTitle", undefined, "crm")}
               onClick={onOpenQrShare}
               className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition shrink-0 ${t.hover}`}
             >
@@ -462,7 +587,7 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
           {mode === "crm" && user && isMobile && (
             <button
               type="button"
-              title="Режим потока — радиальный секвенсор"
+              title={tr("flowModeTitle", undefined, "crm")}
               onClick={onOpenSequencer}
               className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition shrink-0 text-teal-600 dark:text-teal-400 ${t.hover}`}
             >
@@ -472,8 +597,8 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
           {mode === "crm" && user && (
             <button
               type="button"
-              title={`${user.name || user.login} — мой профиль`}
-              onClick={() => setCrmView("settings")}
+              title={tr("myProfile", { name: user.name || user.login }, "crm")}
+              onClick={() => setCrmView("profile")}
               className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border shrink-0 transition hover:ring-2 hover:ring-teal-500/30 ${t.border}`}
             >
               {user.avatar ? (
@@ -486,17 +611,17 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
             </button>
           )}
           {mode === "crm" && user && (
-            <div className="relative">
+            <div ref={bellRef} className="relative z-50">
               <button onClick={() => { setBell(!bell); if (!bell) setNotifs((n) => n.map((x) => ({ ...x, read: true }))); }}
                 className={`relative w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition shrink-0 ${t.hover}`}>
                 <Bell className="w-4 h-4" />
                 {unread > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-teal-500" />}
               </button>
               {bell && (
-                <div className={`absolute right-0 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border shadow-xl overflow-hidden ${t.surface} ${t.border}`}>
-                  <div className={`px-4 py-2.5 text-sm font-medium border-b ${t.border}`}>Уведомления</div>
+                <div className={`absolute right-0 top-[calc(100%+0.5rem)] w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border shadow-2xl overflow-hidden bio-glass-panel z-50 ${t.surface} ${t.border}`}>
+                  <div className={`px-4 py-2.5 text-sm font-medium border-b ${t.border} ${t.text}`}>{tr("notificationsTitle", undefined, "crm")}</div>
                   <div className={`max-h-80 overflow-y-auto nice-scroll divide-y ${t.divide}`}>
-                    {notifs.length === 0 && <p className={`px-4 py-6 text-sm text-center ${t.muted}`}>Пока пусто.</p>}
+                    {notifs.length === 0 && <p className={`px-4 py-6 text-sm text-center ${t.muted}`}>{tr("notificationsEmpty", undefined, "crm")}</p>}
                     {notifs.map((n) => (
                       <button key={n.id} onClick={() => {
                         if (n.leadId) { setBell(false); openLead(n.leadId); }
@@ -518,7 +643,7 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
             {mode === "crm" && user && (
               <button
                 type="button"
-                title={navLayout === "vertical" ? "Горизонтальное меню" : "Вертикальное меню слева"}
+                title={navLayout === "vertical" ? tr("horizontalMenu", undefined, "crm") : tr("verticalMenu", undefined, "crm")}
                 onClick={() => setNavLayout(navLayout === "vertical" ? "horizontal" : "vertical")}
                 className={`w-7 h-7 rounded-md flex items-center justify-center transition ${
                   navLayout === "vertical" ? `${t.surface} shadow-sm text-teal-500` : t.muted
@@ -527,22 +652,22 @@ function TopBar({ t, theme, scrolled, mode, user, onLogout, setColorMode, toggle
                 <PanelLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             )}
-            <button type="button" title="Дневная тема" onClick={() => setColorMode("light")}
+            <button type="button" title={tr("themeLightTitle", undefined, "crm")} onClick={() => setColorMode("light")}
               className={`w-7 h-7 rounded-md flex items-center justify-center transition ${theme.colorMode === "light" ? `${t.surface} shadow-sm text-teal-500` : t.muted}`}>
               <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
-            <button type="button" title="Ночная тема" onClick={() => setColorMode("dark")}
+            <button type="button" title={tr("themeDarkTitle", undefined, "crm")} onClick={() => setColorMode("dark")}
               className={`w-7 h-7 rounded-md flex items-center justify-center transition ${theme.colorMode === "dark" ? `${t.surface} shadow-sm text-teal-500` : t.muted}`}>
               <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
-            <button type="button" title={theme.brandOn ? "Выключить корпоративные цвета" : "Включить корпоративные цвета"} onClick={toggleBrand}
+            <button type="button" title={theme.brandOn ? tr("brandOn", undefined, "crm") : tr("brandOff", undefined, "crm")} onClick={toggleBrand}
               className={`w-7 h-7 rounded-md flex items-center justify-center transition ${theme.brandOn ? `${t.surface} shadow-sm text-teal-500` : t.muted}`}>
               <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
 
           {mode === "crm" && user && (
-            <button onClick={onLogout} title="Выйти" className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition shrink-0 ${t.hover} ${t.muted} hover:text-rose-500`}>
+            <button onClick={onLogout} title={tr("logout", undefined, "auth")} className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition shrink-0 ${t.hover} ${t.muted} hover:text-rose-500`}>
               <LogOut className="w-4 h-4" />
             </button>
           )}
@@ -580,508 +705,180 @@ function Sel({ value, onChange, children, t }) {
 function Labeled({ label, children, t }) {
   return <div><label className={`text-xs font-medium ${t.muted}`}>{label}</label><div className="mt-1">{children}</div></div>;
 }
-function Btn({ children, onClick, variant = "primary", t, className = "" }) {
-  const styles = {
-    primary: "bg-teal-600 text-white hover:bg-teal-700",
-    soft: `${t.chip} ${t.hover}`,
-    ghost: `border ${t.border} ${t.hover}`,
-    danger: "text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10",
-  };
-  return <button onClick={onClick} className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-2xl text-sm font-medium transition shadow-sm ${styles[variant]} ${className}`}>{children}</button>;
-}
-function Stage({ stage }) {
-  const hex = stageHex(stage.color);
+function Btn({ children, onClick, variant = "primary", t, className = "", ...rest }) {
+  const { theme } = useTheme();
+  const base = "inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-2xl text-sm font-medium transition disabled:opacity-40";
+  const variantClass = {
+    primary: `${skinBtn(theme, "primary")}${isNeoTheme(theme) ? "" : " text-white"}`,
+    soft: `${skinBtn(theme, "soft")} ${t.text}`,
+    ghost: `${skinBtn(theme, "ghost")} ${t.text}`,
+    danger: skinBtn(theme, "danger"),
+  }[variant];
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: hex }} />
+    <button type="button" onClick={onClick} className={`${base} ${variantClass} ${className}`} {...rest}>
+      {children}
+    </button>
+  );
+}
+function Stage({ stageId, stages }: { stageId: string; stages: import("./api/client").Stage[] }) {
+  const { theme } = useTheme();
+  const stage = stages.find((s) => s.id === stageId);
+  if (!stage) return null;
+  return (
+    <span
+      className="bio-stage-badge inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+      style={entityCardAccentVars(stage.color, true, theme.colorMode)}
+    >
+      <span className="bio-stage-badge-dot w-2 h-2 rounded-full shrink-0" />
       {stage.label}
     </span>
   );
 }
 
-const DEMO_META = [
-  { login: "manager", name: "Руководитель", icon: BarChart3, desc: "Все сделки и команда" },
-  { login: "operator", name: "Оператор", icon: Headphones, desc: "Свои назначенные сделки" },
-  { login: "marketer", name: "Маркетолог", icon: Megaphone, desc: "Реклама и каналы" },
-  { login: "integrator", name: "Интегратор", icon: Plug, desc: "CRM и приглашения" },
-  { login: "admin", name: "Администратор", icon: Shield, desc: "Полный доступ" },
-];
-
-/* ---------- LOGIN ---------- */
-function Login({ t, onSuccess }) {
-  const { login: doLogin } = useAuth();
-  const [login, setLogin] = useState(""); const [pass, setPass] = useState(""); const [totp, setTotp] = useState("");
-  const [needsTotp, setNeedsTotp] = useState(false);
-  const [err, setErr] = useState("");
-  const [demoLogin, setDemoLogin] = useState(false);
-  const [demoUsers, setDemoUsers] = useState<{ login: string; password: string; name: string }[]>([]);
-  useEffect(() => {
-    api.getAuthConfig().then((r) => {
-      setDemoLogin(r.demoLogin);
-      if (r.demoUsers?.length) setDemoUsers(r.demoUsers);
-    }).catch(() => {});
-  }, []);
-  async function submitWith(credentials?: { login: string; password: string; totpCode?: string }) {
-    const l = credentials?.login ?? login.trim();
-    const p = credentials?.password ?? pass.trim();
-    const tc = credentials?.totpCode ?? (needsTotp ? totp.trim() : undefined);
-    setErr("");
-    try {
-      const r = await doLogin(l, p, tc);
-      if (r.requiresTotp) { setNeedsTotp(true); return; }
-      onSuccess();
-    } catch (e) {
-      const ex = e as Error & { status?: number; data?: { status?: string } };
-      if (ex.status === 403 && ex.data?.status === "pending") setErr("Аккаунт ожидает подтверждения администратором");
-      else setErr(ex.message || "Неверный логин или пароль");
-    }
-  }
-  return (
-    <div className="max-w-md mx-auto px-4 py-12">
-      <div className={`rounded-2xl border shadow-sm p-7 ${t.surface} ${t.border}`}>
-        <div className="flex items-center gap-2 text-lg font-bold"><Building2 className="w-5 h-5 text-teal-600" /> Вход в CRM</div>
-        <div className="mt-5 space-y-3">
-          <Labeled label="Логин" t={t}><TInput t={t} value={login} onChange={setLogin} placeholder="operator или admin" /></Labeled>
-          <Labeled label="Пароль" t={t}><TInput t={t} type="password" value={pass} onChange={setPass} placeholder="••••" onKeyDown={(e) => e.key === "Enter" && submitWith()} /></Labeled>
-          {needsTotp && <Labeled label="Код 2FA" t={t}><TInput t={t} value={totp} onChange={setTotp} placeholder="000000" onKeyDown={(e) => e.key === "Enter" && submitWith()} /></Labeled>}
-          {err && <p className="text-sm text-rose-500">{err}</p>}
-          <Btn t={t} onClick={() => submitWith()} className="w-full">Войти</Btn>
-        </div>
-        {demoLogin && demoUsers.length > 0 && (
-          <div className={`mt-6 border-t pt-4 ${t.border}`}>
-            <p className={`text-xs font-medium ${t.muted} mb-2`}>Демо-доступы (только dev):</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {demoUsers.map((u) => {
-                const meta = DEMO_META.find((m) => m.login === u.login) || DEMO_META[0];
-                return (
-                <button key={u.login} onClick={() => submitWith({ login: u.login, password: u.password })}
-                  className={`text-left border rounded-lg p-3 transition ${t.border} ${t.hover}`}>
-                  <div className="flex items-center gap-2 font-medium text-sm"><meta.icon className="w-4 h-4 text-teal-600" /> {u.name}</div>
-                  <div className={`text-xs ${t.muted} mt-1`}>{meta.desc}</div>
-                </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /* ---------- CRM SHELL ---------- */
-function Crm({ t, user, data, crmView, crmSub, setCrmSub, selectedId, setSelectedId, settingsMode, setSettingsMode, moveLead, updateLead, addNote, addLead, updateData, reload, settingsTab, goCrmView, taskFocusId, setTaskFocusId, onOpenTask, onOpenLead, navigateBack }) {
-  const selected = data.leads.find((l) => l.id === selectedId) || null;
-  const [adding, setAdding] = useState(false);
+function Crm({ t, user, data, crmView, crmSub, setCrmSub, selectedId, setSelectedId, settingsMode, setSettingsMode, moveLead, updateLead, addNote, addLead, updateData, reload, settingsTab, profileTab, reactorTab, blueprintCtx, setBlueprintCtx, goCrmView, taskFocusId, setTaskFocusId, onOpenTask, onOpenLead, onNotify, navigateBack, onReactorBindingChange, reactorProducts }) {
+  const productBySlug = useMemo(() => {
+    const m = new Map<string, import("@sdr-crm/api-client").ReactorProductSummary>();
+    for (const p of reactorProducts ?? []) m.set(p.slug, p);
+    return m;
+  }, [reactorProducts]);
   const [pipelineId, setPipelineId] = useState<string | null>(null);
+  useEffect(() => {
+    setPipelineId(resolveActivePipeline(data.pipelines || [], getStoredPipelineId(), data.stages || []));
+  }, [data.pipelines, data.stages]);
+  const activePipelineId = pipelineId || resolveActivePipeline(data.pipelines || [], null, data.stages || []);
+  const manifestData = useMemo(() => ({
+    leads: data.leads.map((l) => ({
+      id: l.id,
+      name: l.name,
+      statusId: l.statusId,
+      pipelineId: l.pipelineId,
+    })),
+    stages: data.stages,
+    pipelines: data.pipelines,
+    tasks: data.tasks.map((tk) => ({
+      id: tk.id,
+      text: tk.text,
+      status: tk.status,
+      priority: tk.priority,
+      dueAt: tk.dueAt,
+      assignee: tk.assignee,
+    })),
+  }), [data.leads, data.stages, data.pipelines, data.tasks]);
+
   const isMobile = useIsMobile();
-  useEffect(() => {
-    setPipelineId(resolveActivePipeline(data.pipelines || [], getStoredPipelineId()));
-  }, [data.pipelines]);
-  const activePipelineId = pipelineId || resolveActivePipeline(data.pipelines || [], null);
-  const shellPad = crmView === "tasks"
-    ? "px-2 py-2"
-    : "px-2 py-2 sm:px-3 sm:py-3";
-  return (
-    <div className={`w-full min-w-0 flex-1 flex flex-col ${shellPad}`}>
-      {crmView === "crm" && (
-        selected ? (
-          <LeadDetail t={t} user={user} lead={selected} data={data} onBack={navigateBack} updateLead={updateLead} addNote={addNote} moveLead={moveLead} reload={reload} updateData={updateData} onOpenTask={onOpenTask} onNotify={notify} />
-        ) : (
-          <div>
-            {(data.pipelines?.length > 0) && (
-              <div className="flex items-center gap-2 mb-3">
-                <GitBranch className={`w-4 h-4 shrink-0 ${t.muted}`} />
-                <select
-                  value={activePipelineId || ""}
-                  onChange={(e) => { setPipelineId(e.target.value); setStoredPipelineId(e.target.value); }}
-                  className={`rounded-lg border px-3 py-2 text-sm outline-none focus:border-teal-500 min-w-[10rem] ${t.input}`}
-                >
-                  {(data.pipelines || []).map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}{p.isDefault ? " ★" : ""}</option>
-                  ))}
-                </select>
-                {hasPermission(user, "stages.manage") && (
-                  <button type="button" onClick={() => goCrmView("settings", "pipelines")}
-                    className={`text-xs ${t.muted} hover:text-teal-600 underline underline-offset-2`}>
-                    Управление воронками
-                  </button>
-                )}
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3 md:mb-4">
-              <div className={`flex items-center gap-1 rounded-lg p-1 ${t.chip} w-full sm:w-auto`}>
-                <button onClick={() => setCrmSub("kanban")} className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 rounded-md text-sm transition ${crmSub === "kanban" ? `${t.surface} shadow-sm font-medium ${t.text}` : t.muted}`}><Columns className="w-4 h-4" /> Канбан</button>
-                <button onClick={() => setCrmSub("list")} className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 rounded-md text-sm transition ${crmSub === "list" ? `${t.surface} shadow-sm font-medium ${t.text}` : t.muted}`}><List className="w-4 h-4" /> Список</button>
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                {crmSub === "kanban" && hasPermission(user, "stages.manage") && (
-                  <button onClick={() => setSettingsMode(!settingsMode)}
-                    className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition ${settingsMode ? "border-teal-500 bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300" : `${t.border} ${t.muted} ${t.hover}`}`}>
-                    <SlidersHorizontal className="w-4 h-4" />
-                    <span className="hidden sm:inline">Режим настройки</span>
-                    <span className="sm:hidden">Настройка</span>
-                  </button>
-                )}
-                <Btn t={t} variant="soft" className="flex-1 sm:flex-none" onClick={() => setAdding(true)}>
-                  <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">Лид со звонка</span>
-                  <span className="sm:hidden">+ Лид</span>
-                </Btn>
-              </div>
-            </div>
-            {adding && <ManualLead t={t} onCancel={() => setAdding(false)} onSave={(d) => { addLead(d, "phone", "ch_site"); setAdding(false); }} />}
-            {crmSub === "kanban"
-              ? <Kanban t={t} user={user} data={data} pipelineId={activePipelineId} moveLead={moveLead} updateData={updateData} onOpen={onOpenLead} settingsMode={settingsMode && hasPermission(user, "stages.manage")} isMobile={isMobile} />
-              : <LeadsListView t={t} data={data} pipelineId={activePipelineId} onOpen={onOpenLead} />}
-          </div>
-        )
-      )}
-      {crmView === "analytics" && <AnalyticsPage t={t} data={data} user={user} StageBadge={Stage} />}
-      {crmView === "tasks" && (
-        <TasksPage
-          t={t}
-          data={data}
-          user={user}
-          updateData={updateData}
-          onOpenLead={onOpenLead}
-          selectedTaskId={taskFocusId}
-          onSelectTask={setTaskFocusId}
-          onNavigateBack={navigateBack}
-        />
-      )}
-      {crmView === "calls" && hasPermission(user, "calls.view") && (
-        <CallsPage t={t} user={user} onOpenLead={onOpenLead} />
-      )}
-      {crmView === "team" && <TeamPage t={t} user={user} data={data} reload={reload} Btn={Btn} TInput={TInput} Labeled={Labeled} Sel={Sel} />}
-      {crmView === "settings" && (
-        <SettingsHub t={t} user={user} data={data} updateData={updateData} reload={reload}
-          Btn={Btn} TInput={TInput} Labeled={Labeled} initialTab={settingsTab} />
-      )}
-      {crmView === "audit" && hasPermission(user, "audit.view") && <AdminAudit t={t} />}
-    </div>
-  );
-}
+  const faceRuntime = useMemo((): FaceRuntimeContextValue => ({
+    slug: crmView,
+    user,
+    data,
+    t,
+    pipelineId: activePipelineId,
+    setPipelineId,
+    leadId: crmView === "crm" ? selectedId : null,
+    taskId: crmView === "tasks" ? taskFocusId : null,
+    crmSub,
+    setCrmSub,
+    selectedLeadId: selectedId,
+    settingsMode,
+    setSettingsMode,
+    settingsTab,
+    profileTab,
+    reactorTab,
+    taskFocusId,
+    setTaskFocusId,
+    isMobile,
+    reload,
+    updateData,
+    moveLead,
+    updateLead,
+    addNote,
+    addLead,
+    goCrmView,
+    onOpenLead,
+    onOpenTask,
+    onNotify,
+    navigateBack,
+    onReactorBindingChange,
+    reactorProducts,
+    Btn,
+    TInput,
+    Labeled,
+    Sel,
+    Stage,
+    LeadDetail: LeadDetail as unknown as React.ComponentType<Record<string, unknown>>,
+    ManualLead: ManualLead as unknown as React.ComponentType<Record<string, unknown>>,
+    onNavigate: (href) => {
+      const state = parseCrmSearch(href.startsWith("?") ? href : `?${href}`);
+      if (state.view) goCrmView(state.view, state.settings || state.profile || state.reactor);
+      if (state.lead) onOpenLead(state.lead);
+      if (state.task) setTaskFocusId(state.task);
+    },
+    onPatchFields: async (entityType, entityId, patches) => {
+      const r = await api.agentPatchFields(
+        entityType as "lead" | "task" | "contact" | "legal_entity",
+        entityId,
+        patches.map((p) => ({ field: p.field, value: p.value })),
+      );
+      if (r.ok) void reload?.();
+      return { ok: r.ok, error: r.errors?.[0]?.message };
+    },
+  }), [
+    crmView, user, data, t, activePipelineId, selectedId, taskFocusId, crmSub, settingsMode,
+    settingsTab, profileTab, reactorTab, isMobile, reload, reactorProducts,
+    moveLead, updateLead, addNote, addLead, goCrmView, onOpenLead, onOpenTask, onNotify, navigateBack,
+    onReactorBindingChange, setCrmSub, setSettingsMode, setTaskFocusId,
+  ]);
 
-/* ---------- KANBAN ---------- */
-function Kanban({ t, user, data, pipelineId, moveLead, updateData, onOpen, settingsMode, isMobile }) {
-  const [dragLead, setDragLead] = useState(null);
-  const [dragStage, setDragStage] = useState(null);
-  const [over, setOver] = useState(null);
-  const [edit, setEdit] = useState(null);
-  const pipelineStages = stagesForPipeline(data.stages, pipelineId);
-  const [mobileStageId, setMobileStageId] = useState(pipelineStages[0]?.id ?? null);
-  const userRealtorId = data.realtors.find((r) => r.userId === user?.id)?.id ?? null;
-  const stageIds = useMemo(() => new Set(pipelineStages.map((s) => s.id)), [pipelineStages]);
-  const pipelineLeads = leadsForPipeline(data.leads, pipelineId, stageIds);
-  const leadsOf = (sid) => pipelineLeads.filter((l) => l.status === sid);
-  const canMoveLead = (lead) => canEditLead(user, lead, userRealtorId);
+  const productSlug = crmView.startsWith("p:") ? crmView.slice(2) : crmView;
+  const productNav = productBySlug.get(productSlug);
+  const shellPad = crmView === "tasks" ? "px-2 py-2" : "px-2 py-2 sm:px-3 sm:py-3";
 
-  useEffect(() => {
-    if (!pipelineStages.some((s) => s.id === mobileStageId)) {
-      setMobileStageId(pipelineStages[0]?.id ?? null);
-    }
-  }, [pipelineStages, mobileStageId]);
-
-  function saveStage(s) {
-    const stage = { ...s, pipelineId: s.pipelineId || pipelineId };
-    if (stage.id) updateData({ stages: data.stages.map((x) => x.id === stage.id ? stage : x) });
-    else updateData({ stages: [...data.stages, { ...stage, id: uid() }] });
-    setEdit(null);
-  }
-  function deleteStage(id) {
-    if (pipelineStages.length <= 1) return;
-    const rest = pipelineStages.filter((s) => s.id !== id);
-    const otherStages = data.stages.filter((s) => s.pipelineId !== pipelineId);
-    const nextStages = [...otherStages, ...rest];
-    updateData({
-      stages: nextStages,
-      leads: data.leads.map((l) => l.status === id ? { ...l, status: rest[0].id } : l),
-    });
-    setEdit(null);
-  }
-  function reorder(dragId, targetId) {
-    const arr = [...pipelineStages];
-    const from = arr.findIndex((s) => s.id === dragId), to = arr.findIndex((s) => s.id === targetId);
-    if (from < 0 || to < 0) return;
-    const [m] = arr.splice(from, 1); arr.splice(to, 0, m);
-    const otherStages = data.stages.filter((s) => s.pipelineId !== pipelineId);
-    updateData({ stages: [...otherStages, ...arr] });
-  }
-  function drop(targetId) {
-    if (dragStage && dragStage !== targetId) reorder(dragStage, targetId);
-    else if (dragLead) {
-      const lead = data.leads.find((l) => l.id === dragLead);
-      if (lead && canMoveLead(lead)) void moveLead(dragLead, targetId);
-    }
-    setDragLead(null); setDragStage(null); setOver(null);
-  }
-
-  function renderColumn(s: { id: string; label: string; color: string }, mobile = false) {
-    const colW = mobile ? "w-full" : "w-72 shrink-0";
+  if (crmView === "reactor" && canAccessReactor(user)) {
     return (
-      <div key={s.id}
-        onDragOver={(e) => { e.preventDefault(); setOver(s.id); }}
-        onDragLeave={() => setOver((o) => (o === s.id ? null : o))}
-        onDrop={() => drop(s.id)}
-        className={`${colW} rounded-2xl ${t.board} ${over === s.id ? "ring-2 ring-teal-400/35" : "ring-0"} transition-[box-shadow,ring-color] duration-200 ease-out`}
-        style={statusContourStyle(s.color)}>
-        <div className="flex items-center justify-between px-3 py-2.5">
-          <div className="flex items-center gap-2 font-medium text-sm">
-            {settingsMode && (
-              <span draggable onDragStart={() => { setDragStage(s.id); setDragLead(null); }} className={`cursor-grab ${t.muted}`}><GripVertical className="w-4 h-4" /></span>
-            )}
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: stageHex(s.color) }} />{s.label}
-            <span className={`text-xs ${t.muted}`}>{leadsOf(s.id).length}</span>
-          </div>
-          {settingsMode && <button onClick={() => setEdit(s)} className={`${t.muted} hover:text-teal-500`}><Pencil className="w-3.5 h-3.5" /></button>}
+      <FaceRuntimeProvider value={faceRuntime}>
+        <div className={`w-full min-w-0 flex-1 flex flex-col min-h-0 ${shellPad}`}>
+          <ReactorShell
+            t={t}
+            user={user}
+            data={data}
+            updateData={updateData}
+            reload={reload}
+            Btn={Btn}
+            TInput={TInput}
+            Labeled={Labeled}
+            products={reactorProducts ?? []}
+            initialTab={reactorTab}
+            embedded
+          />
         </div>
-        <div className="px-2 pb-2 space-y-2 min-h-12">
-          {leadsOf(s.id).map((l) => {
-            const responsible = leadResponsibleMember(l, data.employees || [], data.realtors);
-            const editable = canMoveLead(l);
-            return (
-              <div key={l.id} draggable={!isMobile && editable} onDragStart={(e) => { if (!editable) return; e.stopPropagation(); setDragLead(l.id); setDragStage(null); }} onDragEnd={() => setDragLead(null)}
-                onClick={() => onOpen(l.id)}
-                className={`rounded-2xl border p-3 h-[5.75rem] flex flex-col cursor-pointer transition-all duration-200 ease-out group ${t.surface} active:scale-[0.99] ${
-                  dragLead === l.id ? "opacity-45 scale-[0.98] shadow-none" : "opacity-100 hover:shadow-md"
-                }`}
-                style={statusContourStyle(s.color)}>
-                <div className="flex items-start gap-2 min-h-0 flex-1">
-                  {!isMobile && <GripVertical className={`w-4 h-4 ${t.muted} mt-0.5 shrink-0 opacity-0 group-hover:opacity-100`} />}
-                  <div className="min-w-0 flex-1 flex flex-col h-full crm-data">
-                    <div className="font-medium text-sm truncate leading-snug">{l.name || "Без имени"}</div>
-                    <div className={`text-xs ${t.muted} truncate mt-0.5 leading-4`}>{l.phone || "—"}</div>
-                    <div className="mt-auto flex items-center gap-1 min-h-[1.375rem] pt-1.5 overflow-hidden">
-                      {l.region ? (
-                        <span className={`text-xs px-1.5 py-0.5 rounded truncate max-w-[48%] shrink-0 ${t.chip}`}>{l.region}</span>
-                      ) : (
-                        <span className="flex-1 min-w-0" />
-                      )}
-                      {responsible && (
-                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 ml-auto shrink-0 max-w-[52%]">
-                          <EmployeeAvatar member={responsible} size="xs" />
-                          <span className="truncate">{responsible.name.split(" ")[0]}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      </FaceRuntimeProvider>
     );
   }
 
-  return (
-    <div>
-      {settingsMode && <p className="text-xs md:text-sm text-teal-600 dark:text-teal-400 mb-3 flex items-center gap-1.5"><SlidersHorizontal className="w-4 h-4" /> Режим настройки этапов и роботов</p>}
+  const showProduct = productBySlug.has(productSlug)
+    || ["crm", "tasks", "analytics", "calls", "team", "edo", "mail", "entities", "resources", "profile", "settings", "audit", "reactor"].includes(productSlug);
 
-      {isMobile && !settingsMode ? (
-        <>
-          <div className={`flex gap-1.5 overflow-x-auto nice-scroll pb-2 -mx-0.5 px-0.5`}>
-            {pipelineStages.map((s) => (
-              <button key={s.id} type="button" onClick={() => setMobileStageId(s.id)}
-                className="shrink-0 px-3 py-2 rounded-full text-xs font-medium border transition"
-                style={stagePillStyle(s.color, mobileStageId === s.id)}>
-                {s.label}
-                <span className="ml-1 opacity-80">{leadsOf(s.id).length}</span>
-              </button>
-            ))}
-          </div>
-          {pipelineStages.filter((s) => s.id === mobileStageId).map((s) => renderColumn(s, true))}
-        </>
-      ) : (
-        <div className={`flex gap-3 md:gap-4 overflow-x-auto nice-scroll pb-3 ${isMobile ? "snap-x snap-mandatory" : ""}`}>
-          {pipelineStages.map((s) => (
-            <div key={s.id} className={isMobile ? "snap-center shrink-0 w-[min(85vw,24rem)]" : ""}>
-              {renderColumn(s, false)}
-            </div>
-          ))}
-          {settingsMode && (
-            <button onClick={() => setEdit({ pipelineId, label: "", color: recommendStageColor(pipelineStages.length, pipelineStages.length + 1), automations: [] })}
-              className={`${isMobile ? "w-[min(85vw,24rem)] shrink-0 snap-center" : "w-72 shrink-0"} rounded-xl border-2 border-dashed ${t.border} ${t.muted} hover:text-teal-500 hover:border-teal-400 flex items-center justify-center gap-2 text-sm py-6 transition`}>
-              <Plus className="w-4 h-4" /> Добавить этап
-            </button>
-          )}
-        </div>
-      )}
-      {edit && <StageModal t={t} stage={edit} data={data} pipelineId={pipelineId} onClose={() => setEdit(null)} onSave={saveStage} onDelete={deleteStage} canDelete={pipelineStages.length > 1} />}
-    </div>
-  );
-}
-
-function StageModal({ t, stage, data, pipelineId, onClose, onSave, onDelete, canDelete }) {
-  const [s, setS] = useState({ ...stage, automations: stage.automations || [] });
-  const localStages = stagesForPipeline(data.stages, pipelineId || stage.pipelineId);
-  const stageIndex = stage.id ? localStages.findIndex((x) => x.id === stage.id) : localStages.length;
-  const totalStages = localStages.length + (stage.id ? 0 : 1);
-  const recommended = recommendStageColor(stageIndex, totalStages);
-  const hint = harmonyHint(stageIndex, totalStages);
-  const connected = data.channels.filter((c) => c.connected);
-  const authors = ["Система", ...data.realtors.map((r) => r.name)];
-  const fieldOptions = [
-    { key: "name", label: "Имя" },
-    { key: "phone", label: "Телефон" },
-    { key: "email", label: "Email" },
-    { key: "region", label: "Регион" },
-    { key: "preferredTime", label: "Удобное время" },
-    { key: "comment", label: "Комментарий" },
-    ...data.fields.map((f) => ({ key: f.id, label: f.label })),
-  ];
-  function addAuto() { setS({ ...s, automations: [...s.automations, { id: uid(), type: "notify", author: "Система", recipient: "Ответственный", text: "" }] }); }
-  function upd(id, patch) { setS({ ...s, automations: s.automations.map((a) => a.id === id ? { ...a, ...patch } : a) }); }
-  function del(id) { setS({ ...s, automations: s.automations.filter((a) => a.id !== id) }); }
-  function recipientOptions(type) {
-    if (type === "reply") return ["Клиент"];
-    if (type === "task" || type === "assign") return ["Ответственный", ...data.realtors.map((r) => r.name)];
-    return ["Ответственный", "Все", ...data.realtors.map((r) => r.name)];
-  }
-  function stagesInPipeline(pid) {
-    return stagesForPipeline(data.stages, pid);
-  }
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className={`w-full max-w-lg rounded-2xl border shadow-2xl ${t.surface} ${t.border} max-h-[88vh] overflow-y-auto nice-scroll`}>
-        <div className={`flex items-center justify-between px-5 py-3 border-b ${t.border} sticky top-0 ${t.surface}`}>
-          <h3 className="font-semibold">{stage.id ? "Настройка этапа" : "Новый этап"}</h3>
-          <button onClick={onClose} className={t.muted}><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-5 space-y-4">
-          <Labeled label="Название этапа" t={t}><TInput t={t} value={s.label} onChange={(v) => setS({ ...s, label: v })} placeholder="Например, Назначен показ" /></Labeled>
-          <div>
-            <label className={`text-xs font-medium ${t.muted}`}>Цвет</label>
-            <p className={`text-[11px] ${t.muted} mt-1`}>
-              Рекомендация:{" "}
-              <button type="button" onClick={() => setS({ ...s, color: recommended })}
-                className="text-teal-600 dark:text-teal-400 underline underline-offset-2">
-                {recommended}
-              </button>
-              {" "}— {hint.toLowerCase()}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {STAGE_COLORS.map((c) => (
-                <button key={c} type="button" onClick={() => setS({ ...s, color: c })}
-                  title={c === recommended ? "Рекомендуемый" : c}
-                  className={`w-7 h-7 rounded-full transition relative ${s.color === c ? "ring-2 ring-offset-2 ring-teal-500 dark:ring-offset-slate-800" : ""}`}
-                  style={{ backgroundColor: stageHex(c) }}>
-                  {c === recommended && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white border border-teal-500" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between">
-              <label className={`text-xs font-medium ${t.muted}`}>Роботы при попадании на этап</label>
-              <button onClick={addAuto} className="text-teal-600 text-sm inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Добавить робота</button>
-            </div>
-            <div className="space-y-3 mt-2">
-              {s.automations.length === 0 && <p className={`text-sm ${t.muted}`}>Нет роботов. Добавьте уведомление, задачу, перемещение или копирование сделки.</p>}
-              {s.automations.map((a) => (
-                <div key={a.id} className={`rounded-lg border p-3 space-y-2 ${t.border} ${t.soft}`}>
-                  <div className="flex items-center gap-2">
-                    <Sel t={t} value={a.type} onChange={(v) => upd(a.id, {
-                      type: v,
-                      recipient: v === "reply" ? "Клиент" : "Ответственный",
-                      targetStageId: undefined,
-                      targetPipelineId: undefined,
-                      assignUserId: undefined,
-                      fieldKey: undefined,
-                    })}>
-                      {AUTO_TYPES.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
-                    </Sel>
-                    <button onClick={() => del(a.id)} className="text-rose-500 shrink-0"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                  {["reply", "task", "notify"].includes(a.type) && (
-                    <>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Labeled label="Автор" t={t}>
-                          <Sel t={t} value={a.author || "Система"} onChange={(v) => upd(a.id, { author: v })}>
-                            {authors.map((x) => <option key={x} value={x}>{x}</option>)}
-                          </Sel>
-                        </Labeled>
-                        <Labeled label="Адресат" t={t}>
-                          <Sel t={t} value={a.recipient || recipientOptions(a.type)[0]} onChange={(v) => upd(a.id, { recipient: v })}>
-                            {recipientOptions(a.type).map((x) => <option key={x} value={x}>{x}</option>)}
-                          </Sel>
-                        </Labeled>
-                      </div>
-                      {a.type === "reply" && (
-                        <Labeled label="Канал" t={t}>
-                          <Sel t={t} value={a.channelId || ""} onChange={(v) => upd(a.id, { channelId: v })}>
-                            <option value="">Выберите канал…</option>
-                            {connected.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </Sel>
-                        </Labeled>
-                      )}
-                      <TInput t={t} value={a.text || ""} onChange={(v) => upd(a.id, { text: v })}
-                        placeholder={a.type === "reply" ? "Текст сообщения клиенту" : a.type === "task" ? "Что сделать" : "Текст уведомления"} />
-                    </>
-                  )}
-                  {a.type === "move" && (
-                    <Labeled label="Целевой этап" t={t}>
-                      <Sel t={t} value={a.targetStageId || ""} onChange={(v) => upd(a.id, { targetStageId: v })}>
-                        <option value="">Выберите этап…</option>
-                        {data.stages.map((st) => (
-                          <option key={st.id} value={st.id}>
-                            {(data.pipelines?.find((p) => p.id === st.pipelineId)?.name || "Воронка")} → {st.label}
-                          </option>
-                        ))}
-                      </Sel>
-                    </Labeled>
-                  )}
-                  {a.type === "copy" && (
-                    <>
-                      <Labeled label="Воронка" t={t}>
-                        <Sel t={t} value={a.targetPipelineId || ""} onChange={(v) => upd(a.id, { targetPipelineId: v, targetStageId: "" })}>
-                          <option value="">Выберите воронку…</option>
-                          {(data.pipelines || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </Sel>
-                      </Labeled>
-                      <Labeled label="Этап" t={t}>
-                        <Sel t={t} value={a.targetStageId || ""} onChange={(v) => upd(a.id, { targetStageId: v })}>
-                          <option value="">Выберите этап…</option>
-                          {stagesInPipeline(a.targetPipelineId).map((st) => (
-                            <option key={st.id} value={st.id}>{st.label}</option>
-                          ))}
-                        </Sel>
-                      </Labeled>
-                    </>
-                  )}
-                  {a.type === "assign" && (
-                    <Labeled label="Сотрудник" t={t}>
-                      <Sel t={t} value={a.assignUserId || ""} onChange={(v) => upd(a.id, { assignUserId: v || undefined })}>
-                        <option value="">Ответственный (текущий)</option>
-                        {(data.employees || []).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-                      </Sel>
-                    </Labeled>
-                  )}
-                  {a.type === "field" && (
-                    <>
-                      <Labeled label="Поле" t={t}>
-                        <Sel t={t} value={a.fieldKey || ""} onChange={(v) => upd(a.id, { fieldKey: v })}>
-                          <option value="">Выберите поле…</option>
-                          {fieldOptions.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-                        </Sel>
-                      </Labeled>
-                      <TInput t={t} value={a.fieldValue || ""} onChange={(v) => upd(a.id, { fieldValue: v })} placeholder="Новое значение" />
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className={`flex items-center justify-between px-5 py-3 border-t ${t.border} sticky bottom-0 ${t.surface}`}>
-          {stage.id && canDelete ? <Btn t={t} variant="danger" onClick={() => onDelete(stage.id)}><Trash2 className="w-4 h-4" /> Удалить</Btn> : <span />}
-          <Btn t={t} onClick={() => s.label.trim() && onSave(s)}><Check className="w-4 h-4" /> Сохранить</Btn>
-        </div>
+    <FaceRuntimeProvider value={faceRuntime}>
+      <div className={`w-full min-w-0 flex-1 flex flex-col min-h-0 ${shellPad}`}>
+        {showProduct && (
+          <FaceProductShell
+            slug={productSlug}
+            product={productNav}
+            user={user}
+            t={t}
+            context={{
+              pipelineId: activePipelineId,
+              leadId: crmView === "crm" ? selectedId ?? undefined : undefined,
+              taskId: crmView === "tasks" ? taskFocusId ?? undefined : undefined,
+            }}
+            data={manifestData}
+            onNavigate={faceRuntime.onNavigate}
+            onPatchFields={faceRuntime.onPatchFields}
+          />
+        )}
       </div>
-    </div>
+    </FaceRuntimeProvider>
   );
 }
 
@@ -1130,25 +927,18 @@ function ManualLead({ t, onCancel, onSave }) {
 
 /* ---------- LEAD DETAIL ---------- */
 function CustomFieldInput({ field, value, onChange, onBlur, data, t }) {
-  if (field.type === "employee")
-    return <Sel t={t} value={value || ""} onChange={onChange}><option value="">—</option>{data.realtors.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Sel>;
-  if (field.type === "link")
-    return <div className="flex gap-2">
-      <TInput t={t} type="url" value={value || ""} onChange={onChange} onBlur={onBlur} placeholder="https://" />
-      {value && <a href={value} target="_blank" rel="noreferrer" className="px-2 flex items-center text-teal-600 shrink-0"><ExternalLink className="w-4 h-4" /></a>}
-    </div>;
-  if (field.type === "date")
-    return <GlassDatePicker value={value || ""} onChange={onChange} />;
-  if (field.type === "datetime")
-    return <GlassDateTimePicker value={value || ""} onChange={onChange} />;
-  if (field.type === "phone") {
-    return <TInput t={t} type="tel" inputMode="tel" value={value || ""}
-      onChange={(v) => onChange(formatPhoneInput(v))}
+  return (
+    <CrmFieldInput
+      field={{ ...field, meta: field.meta ?? {} }}
+      value={value}
+      onChange={onChange}
       onBlur={onBlur}
-      placeholder={PHONE_FORMAT_HINT} />;
-  }
-  const typeMap = { number: "number", money: "number" };
-  return <TInput t={t} type={typeMap[field.type] || "text"} value={value || ""} onChange={onChange} onBlur={onBlur} placeholder={field.type === "money" ? "₽" : ""} />;
+      t={t}
+      TInput={TInput}
+      Sel={Sel}
+      dealManagers={data.dealManagers}
+    />
+  );
 }
 
 function LeadCustomFieldEditor({ field, lead, data, t, patchLead }) {
@@ -1163,7 +953,7 @@ function LeadCustomFieldEditor({ field, lead, data, t, patchLead }) {
     immediate: field.type !== "phone",
   });
   return (
-    <Labeled label={field.label} t={t}>
+    <Labeled label={isFieldRequired(field, { stageId: lead.statusId }) ? `${field.label} *` : field.label} t={t}>
       <CustomFieldInput field={field} data={data} t={t}
         value={draft.value}
         onChange={draft.setValue}
@@ -1174,20 +964,24 @@ function LeadCustomFieldEditor({ field, lead, data, t, patchLead }) {
   );
 }
 
-function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead, reload, updateData, onOpenTask, onNotify }) {
+function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead, reload, updateData, onOpenTask, onNotify, goCrmView }) {
+  const { tr } = useUiT();
+  const { theme } = useTheme();
   const [note, setNote] = useState("");
   const [erasing, setErasing] = useState(false);
   const [dialing, setDialing] = useState(false);
   const [detailTab, setDetailTab] = useState<"card" | "history">("card");
+  const [blocksLayoutMode, setBlocksLayoutMode] = useState(false);
+  const [cardBlocks, setCardBlocks] = useState<LeadCardBlock[]>(() => normalizeLeadCardBlocks(data.leadCardBlocks));
   const canErase = hasPermission(user, "leads.erase") && !lead.erasedAt;
   const canExport = hasPermission(user, "leads.export") && !lead.erasedAt;
   const canLayout = hasPermission(user, "fields.manage");
-  const userRealtorId = data.realtors.find((r) => r.userId === user?.id)?.id ?? null;
-  const canEdit = canEditLead(user, lead, userRealtorId);
+  const userDealManagerId = data.dealManagers.find((r) => r.userId === user?.id)?.id ?? null;
+  const canEdit = canEditLead(user, lead, userDealManagerId);
   const canAssign = canAssignLead(user);
   const stage = data.stages.find((s) => s.id === lead.status);
   const employees = data.employees || [];
-  const responsibleMember = leadResponsibleMember(lead, employees, data.realtors);
+  const responsibleMember = leadResponsibleMember(lead, employees, data.dealManagers);
   const watcherList = uniqueWatcherMembers(employees, lead.watchers);
   const sIdx = data.stages.findIndex((s) => s.id === lead.status);
 
@@ -1212,7 +1006,7 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
     leadId: lead.id,
     serverValue: lead.name,
     onSave: (v) => patchLead({ name: String(v).trim() }),
-    validate: (v) => (!String(v).trim() ? "Имя обязательно" : null),
+    validate: (v) => (!String(v).trim() ? tr("nameRequired", undefined, "crm") : null),
   });
 
   const phoneField = useLeadFieldDraft({
@@ -1220,7 +1014,7 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
     serverValue: lead.phone ? formatPhoneDisplay(lead.phone) : "",
     onSave: (v) => patchLead({ phone: v }),
     validate: (v) => {
-      if (!String(v).trim()) return "Телефон обязателен";
+      if (!String(v).trim()) return tr("phoneRequired", undefined, "crm");
       if (!isValidRuPhone(v)) return `Формат: ${PHONE_FORMAT_HINT}`;
       return null;
     },
@@ -1233,7 +1027,7 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
     onSave: (v) => patchLead({ email: String(v).trim() || null }),
     validate: (v) => {
       const s = String(v).trim();
-      if (s && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return "Некорректный email";
+      if (s && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return tr("invalidEmail", undefined, "crm");
       return null;
     },
     immediate: false,
@@ -1260,17 +1054,91 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
     updateData({ fields: fieldsSaved, cardLayout: layoutSaved });
   }
 
+  useEffect(() => {
+    setCardBlocks(normalizeLeadCardBlocks(data.leadCardBlocks));
+  }, [data.leadCardBlocks]);
+
+  async function saveCardBlocks(next: LeadCardBlock[]) {
+    setCardBlocks(next);
+    if (!canLayout) return;
+    const saved = await persistLeadCardBlocks(next);
+    updateData({ leadCardBlocks: saved });
+  }
+
+  function blockVisible(block: LeadCardBlock) {
+    if (block.type === "edo") return hasPermission(user, "edo.view");
+    if (block.type === "legal") return hasPermission(user, "legal.view");
+    if (block.type === "deal") return hasPermission(user, "resources.view");
+    if (block.type === "mail") return hasPermission(user, "mail.view");
+    return true;
+  }
+
+  function renderLeadBlock(block: LeadCardBlock) {
+    if (block.type === "custom") return null;
+    const wrap = (children: React.ReactNode) => (
+      <div className={`rounded-2xl p-5 bio-card ${t.surface}`}>{children}</div>
+    );
+    if (block.type === "tasks") {
+      return wrap(<LeadTasksBlock t={t} leadId={lead.id} tasks={data.tasks} allTasks={data.tasks} dealManagers={data.dealManagers} leads={data.leads} user={user} updateData={updateData} onOpenTask={onOpenTask} />);
+    }
+    if (block.type === "edo") {
+      return wrap(<LeadDocumentsPanel t={t} user={user} Btn={Btn} TInput={TInput} Labeled={Labeled} initialLeadId={lead.id} compact />);
+    }
+    if (block.type === "legal") {
+      return wrap(<LeadEntitiesPanel t={t} user={user} Btn={Btn} TInput={TInput} Labeled={Labeled} initialLeadId={lead.id} compact />);
+    }
+    if (block.type === "deal") {
+      return wrap(<LeadResourcesPanel t={t} user={user} pipelines={data.pipelines} Btn={Btn} TInput={TInput} Labeled={Labeled} initialLeadId={lead.id} compact />);
+    }
+    if (block.type === "calls") {
+      return wrap(
+        <LeadCallHistory t={t} user={user} leadId={lead.id} phone={lead.phone} sidebar onDial={handleDial} dialing={dialing} />,
+      );
+    }
+    if (block.type === "mail") {
+      return wrap(<LeadMailPanel t={t} user={user} Btn={Btn} initialLeadId={lead.id} onOpenMail={() => goCrmView("mail")} />);
+    }
+    if (block.type === "notes") {
+      return wrap(
+        <>
+          <h3 className="font-semibold flex items-center gap-2 text-sm mb-3"><MessageSquare className="w-4 h-4 text-teal-600" /> Заметки</h3>
+          <div className="space-y-2.5 mb-4 max-h-[min(70vh,32rem)] overflow-y-auto nice-scroll">
+            {lead.notes.length === 0 && <p className={`text-sm ${t.muted}`}>Пока нет записей.</p>}
+            {lead.notes.map((n) => (
+              <div key={n.id} style={bioNoteStyle(stage?.color)} className="crm-data">
+                <p className={`text-sm ${t.subtle}`}>{n.text}</p>
+                <p className={`text-xs ${t.muted} mt-0.5`}>{n.author} · {new Date(n.date).toLocaleString("ru-RU")}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {canEdit ? (
+              <>
+                <TInput t={t} value={note} onChange={setNote} placeholder="Итог звонка, договорённости…"
+                  onKeyDown={(e) => { if (e.key === "Enter" && note.trim()) { addNote(lead.id, note.trim()); setNote(""); } }} />
+                <Btn t={t} onClick={() => { if (note.trim()) { addNote(lead.id, note.trim()); setNote(""); } }}><Send className="w-4 h-4" /></Btn>
+              </>
+            ) : (
+              <p className={`text-xs ${t.muted}`}>Добавлять записи могут ответственный и пользователи с правом редактирования сделок.</p>
+            )}
+          </div>
+        </>,
+      );
+    }
+    return null;
+  }
+
   return (
     <div className="space-y-3 md:space-y-4">
-      <button onClick={onBack} className={`inline-flex items-center gap-1 text-sm py-1 ${t.muted} hover:text-teal-500`}><ChevronLeft className="w-4 h-4" /> Назад</button>
+      <button onClick={onBack} className={`inline-flex items-center gap-1 text-sm py-1 ${t.muted} hover:text-teal-500`}><ChevronLeft className="w-4 h-4" /> {tr("back", undefined, "common")}</button>
       <div className="flex flex-wrap gap-1.5 py-1">
         {data.stages.map((s, i) => {
           const active = i === sIdx, done = i < sIdx;
-          const btnStyle = stagePipelineStyle(s.color, active, done);
+          const btnStyle = stagePipelineStyle(s.color, active, done, theme.colorMode);
           if (!canEdit) {
             return (
               <span key={s.id} title={s.label}
-                className="shrink-0 px-4 py-2.5 rounded-2xl text-xs font-semibold whitespace-nowrap"
+                className="bio-stage-pipeline shrink-0 px-4 py-2.5 rounded-2xl text-xs font-semibold whitespace-nowrap"
                 style={btnStyle}>
                 {s.label}
               </span>
@@ -1278,7 +1146,7 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
           }
           return (
             <button key={s.id} onClick={() => moveLead(lead.id, s.id)} title={s.label}
-              className="shrink-0 px-4 py-2.5 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="bio-stage-pipeline shrink-0 px-4 py-2.5 rounded-2xl text-xs font-semibold whitespace-nowrap hover:scale-[1.01] active:scale-[0.99]"
               style={btnStyle}>
               {s.label}
             </button>
@@ -1288,17 +1156,17 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
       <div className={`rounded-2xl bio-card p-3 md:p-4 flex flex-col lg:flex-row gap-4 ${t.surface}`}>
         <LeadAssignSection
           t={t}
-          label="Ответственный"
+          label={tr("assignee", undefined, "crm")}
           icon={User}
           assignedMembers={responsibleMember ? [responsibleMember] : []}
           pickPool={employees.filter((m) => !(lead.watchers || []).includes(m.id))}
           editable={canAssign}
           onAdd={canAssign ? (id) => updateLead(lead.id, { assignedUserId: id }) : undefined}
-          onRemove={canAssign ? () => updateLead(lead.id, { assignedUserId: null, assignedRealtorId: null }) : undefined}
+          onRemove={canAssign ? () => updateLead(lead.id, { assignedUserId: null, assignedDealManagerId: null }) : undefined}
         />
         <LeadAssignSection
           t={t}
-          label="Наблюдатели"
+          label={tr("watchers", undefined, "crm")}
           icon={Eye}
           assignedMembers={watcherList}
           pickPool={employees.filter((m) => m.id !== responsibleMember?.id)}
@@ -1310,15 +1178,15 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
       </div>
       <div className={`inline-flex gap-1 p-1 rounded-2xl bio-card ${t.surface}`}>
         {([
-          { id: "card" as const, label: "Карточка", icon: Building2 },
-          { id: "history" as const, label: "История", icon: ScrollText },
+          { id: "card" as const, label: tr("tabCard", undefined, "crm"), icon: Building2 },
+          { id: "history" as const, label: tr("tabHistory", undefined, "crm"), icon: ScrollText },
         ]).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
             onClick={() => setDetailTab(id)}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition ${
-              detailTab === id ? "bg-teal-600 text-white shadow-sm" : `${t.muted} ${t.hover}`
+              detailTab === id ? "bio-tab-active" : `${t.muted} ${t.hover}`
             }`}
           >
             <Icon className="w-4 h-4" /> {label}
@@ -1333,9 +1201,23 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
           createdBy={lead.createdBy}
         />
       ) : (
+      <>
+      {canLayout && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setBlocksLayoutMode((v) => !v)}
+            className={`text-[10px] uppercase tracking-wide px-2.5 py-1 rounded-full border transition ${
+              blocksLayoutMode ? "bg-teal-600 text-white border-teal-500/40" : `${t.border} ${t.muted} ${t.hover}`
+            }`}
+          >
+            {blocksLayoutMode ? "Готово" : "Раскладка блоков"}
+          </button>
+        </div>
+      )}
       <div
-        className={`rounded-2xl overflow-hidden ${t.surface}`}
-        style={stage ? statusContourStyle(stage.color, true) : undefined}
+        className={`rounded-2xl overflow-hidden bio-status-panel bio-status-panel--strong ${t.surface}`}
+        style={stage ? entityCardAccentVars(stage.color, true, theme.colorMode) : undefined}
       >
         <div className="grid lg:grid-cols-3 gap-4 p-3 md:p-4">
         <div className="lg:col-span-2 space-y-4">
@@ -1345,7 +1227,7 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
                 {canEdit ? (
                   <>
                     <div className="text-lg md:text-xl font-bold">
-                      <TInput t={t} value={nameField.value} onChange={nameField.setValue} onBlur={nameField.onBlur} placeholder="Имя клиента" />
+                      <TInput t={t} value={nameField.value} onChange={nameField.setValue} onBlur={nameField.onBlur} placeholder={tr("clientName", undefined, "crm")} />
                       <FieldError msg={nameField.error} t={t} />
                     </div>
                     <div className="mt-1">
@@ -1366,7 +1248,7 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
                   </>
                 )}
               </div>
-              {stage && <Stage stage={stage} />}
+              {stage && <Stage stageId={stage.id} stages={[stage]} />}
             </div>
             {lead.createdAt && (
               <p className={`text-xs ${t.muted} mb-3 crm-data`}>
@@ -1378,6 +1260,7 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
               t={t}
               fields={data.fields}
               cardLayout={data.cardLayout}
+              hiddenCardFields={data.hiddenCardFields}
               editable={canLayout}
               onSaveLayout={saveFieldLayout}
               renderBuiltin={(key) => {
@@ -1450,45 +1333,32 @@ function LeadDetail({ t, user, lead, data, onBack, updateLead, addNote, moveLead
               </div>
             )}
           </div>
-          <div className={`rounded-2xl p-5 bio-card ${t.surface}`}>
-            <LeadTasksBlock t={t} leadId={lead.id} tasks={data.tasks} allTasks={data.tasks} realtors={data.realtors} leads={data.leads} user={user} updateData={updateData} onOpenTask={onOpenTask} />
-          </div>
+          <LeadCardSectionLayout
+            t={t}
+            column="main"
+            blocks={cardBlocks}
+            layoutMode={blocksLayoutMode}
+            canEdit={canLayout}
+            onChange={(next) => void saveCardBlocks(next)}
+            isBlockVisible={blockVisible}
+            renderBlock={renderLeadBlock}
+          />
         </div>
         <div className={`rounded-2xl p-4 md:p-5 bio-card ${t.surface} lg:sticky lg:top-4 lg:self-start space-y-4`}>
-          <LeadCallHistory
+          <LeadCardSectionLayout
             t={t}
-            user={user}
-            leadId={lead.id}
-            phone={lead.phone}
-            sidebar
-            onDial={handleDial}
-            dialing={dialing}
+            column="sidebar"
+            blocks={cardBlocks}
+            layoutMode={blocksLayoutMode}
+            canEdit={canLayout}
+            onChange={(next) => void saveCardBlocks(next)}
+            isBlockVisible={blockVisible}
+            renderBlock={renderLeadBlock}
           />
-          <div className="bio-divide" />
-          <h3 className="font-semibold flex items-center gap-2 text-sm"><MessageSquare className="w-4 h-4 text-teal-600" /> Заметки</h3>
-          <div className="space-y-2.5 mb-4 max-h-[min(70vh,32rem)] overflow-y-auto nice-scroll">
-            {lead.notes.length === 0 && <p className={`text-sm ${t.muted}`}>Пока нет записей.</p>}
-            {lead.notes.map((n) => (
-              <div key={n.id} style={bioNoteStyle(stage?.color)} className="crm-data">
-                <p className={`text-sm ${t.subtle}`}>{n.text}</p>
-                <p className={`text-xs ${t.muted} mt-0.5`}>{n.author} · {new Date(n.date).toLocaleString("ru-RU")}</p>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            {canEdit ? (
-              <>
-                <TInput t={t} value={note} onChange={setNote} placeholder="Итог звонка, договорённости…"
-                  onKeyDown={(e) => { if (e.key === "Enter" && note.trim()) { addNote(lead.id, note.trim()); setNote(""); } }} />
-                <Btn t={t} onClick={() => { if (note.trim()) { addNote(lead.id, note.trim()); setNote(""); } }}><Send className="w-4 h-4" /></Btn>
-              </>
-            ) : (
-              <p className={`text-xs ${t.muted}`}>Добавлять записи могут ответственный и пользователи с правом редактирования сделок.</p>
-            )}
-          </div>
         </div>
         </div>
       </div>
+      </>
       )}
     </div>
   );

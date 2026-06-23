@@ -6,9 +6,17 @@ import { db } from "../../db/index.js";
 import { integrations } from "../../db/schema.js";
 import { getAdapter } from "../../telephony/adapters/index.js";
 import { processCallEvent } from "../../telephony/service.js";
+import { verifyWebhookAuth } from "../../lib/webhook-secret.js";
 import type { Context } from "hono";
 
+const ALLOWED_TELEPHONY_PROVIDERS = new Set([
+  "generic", "mango", "zadarma", "uis", "asterisk", "beeline",
+]);
+
 async function ingest(c: Context, provider: string) {
+  if (!ALLOWED_TELEPHONY_PROVIDERS.has(provider)) {
+    return c.json({ error: "Unknown provider" }, 400);
+  }
   const ip = getClientIp(c);
   if (!rateLimit(`webhook-tel:${ip}`, 120, 60_000)) {
     return c.json({ error: "Too many requests" }, 429);
@@ -18,15 +26,11 @@ async function ingest(c: Context, provider: string) {
   if (!integration?.enabled) return c.json({ error: "Telephony integration disabled" }, 403);
 
   const config = (integration.config || {}) as { webhookSecret?: string };
-  const secret = c.req.header("X-Webhook-Secret") || c.req.query("secret");
-  const prod = process.env.NODE_ENV === "production";
-  if (prod && !config.webhookSecret) {
-    return c.json({ error: "Telephony webhook secret not configured" }, 503);
-  }
-  if (config.webhookSecret) {
-    if (secret !== config.webhookSecret) return c.json({ error: "Invalid webhook secret" }, 401);
-  } else if (prod) {
-    return c.json({ error: "Invalid webhook secret" }, 401);
+  const secret = c.req.header("X-Webhook-Secret");
+  const raw = await c.req.text();
+  const check = verifyWebhookAuth(secret, raw, c.req.header("X-Webhook-Signature"), config.webhookSecret);
+  if (!check.ok) {
+    return c.json({ error: check.error }, check.status);
   }
 
   const adapter = getAdapter(provider);
@@ -34,20 +38,22 @@ async function ingest(c: Context, provider: string) {
   try {
     const ct = c.req.header("content-type") || "";
     if (ct.includes("xml")) {
-      body = await c.req.text();
+      body = raw;
     } else if (ct.includes("json")) {
-      body = await c.req.json();
+      body = raw ? JSON.parse(raw) : {};
     } else {
-      const form = await c.req.parseBody();
+      const params = new URLSearchParams(raw);
+      const form: Record<string, string> = {};
+      for (const [k, v] of params.entries()) form[k] = v;
       const textField = form.payload || form.data;
       if (typeof textField === "string" && (textField.trim().startsWith("<") || textField.trim().startsWith("{"))) {
         body = textField;
-      } else {
-        body = Object.fromEntries(Object.entries(form).filter(([, v]) => typeof v === "string"));
+      } else if (Object.keys(form).length) {
+        body = form;
       }
     }
   } catch {
-    try { body = await c.req.text(); } catch { body = {}; }
+    body = raw || {};
   }
 
   const query = c.req.query();

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Classic CRM vs SDR CRM — сравнительный бенчмарк.
+ * Classic CRM vs Advanced bench — сравнительный бенчмарк.
  * Лог: tests/crm_comparison/logs/comparison.log (один файл)
  * Запуск: npx tsx tests/crm_comparison/compare-bench.ts
  */
@@ -56,7 +56,7 @@ const INDUSTRY = {
   caStabilityMin: 0.35,
 } as const;
 
-type Verdict = "SDR_WIN" | "CLASSIC_WIN" | "PARITY" | "SDR_WIN_GAP" | "FAIL";
+type Verdict = "BENCH_WIN" | "CLASSIC_WIN" | "PARITY" | "BENCH_WIN_GAP" | "FAIL";
 type CmpRow = {
   id: string; axis: string;
   classic: { label: string; value: number | string; unit?: string };
@@ -81,7 +81,7 @@ function section(title: string) {
   log(`\n${"=".repeat(80)}\n${title}\n${"=".repeat(80)}`);
 }
 
-// ─── SDR core: @sdr-crm/sdr-core ───────────────────────────────────────────
+// ─── Bench core: @sdr-crm/sdr-core ───────────────────────────────────────────
 const FEATURES = [
   "high_income", "repeat_visit", "complaint", "night_activity", "channel_paid", "region_moscow",
   "fast_response", "long_comment", "referral", "mobile_user", "email_open", "call_answered",
@@ -118,11 +118,11 @@ function generateSessionEvents(n: number, insider = false): SessionEvent[] {
   return events;
 }
 
-type SqlRow = { leadId: string; stage: string; pipeline: string; channel: string; realtor: string; orgUnit: string };
+type SqlRow = { leadId: string; stage: string; pipeline: string; channel: string; dealManager: string; orgUnit: string };
 function buildGraph(n: number): SqlRow[] {
   return Array.from({ length: n }, (_, i) => ({
     leadId: `lead-${i}`, stage: `stage-${i % 20}`, pipeline: `pipe-${i % 5}`,
-    channel: `ch-${i % 8}`, realtor: `realtor-${i % 50}`, orgUnit: `org-${i % 10}`,
+    channel: `ch-${i % 8}`, dealManager: `dealManager-${i % 50}`, orgUnit: `org-${i % 10}`,
   }));
 }
 function sqlFiveHop(rows: SqlRow[], leadId: string) {
@@ -132,7 +132,7 @@ function sqlFiveHop(rows: SqlRow[], leadId: string) {
   const s1 = hop("stage", lead.stage);
   const s2 = s1 ? hop("pipeline", s1.pipeline) : undefined;
   const s3 = s2 ? hop("channel", s2.channel) : undefined;
-  const s4 = s3 ? hop("realtor", s3.realtor) : undefined;
+  const s4 = s3 ? hop("deal_manager", s3.dealManager) : undefined;
   return s4 ? hop("orgUnit", s4.orgUnit) : undefined;
 }
 function benchSql(rows: SqlRow[], queries: string[]) {
@@ -232,9 +232,9 @@ function cmpNum(classic: number, sdr: number, industry: number, higherBetter: bo
   const cOk = higherBetter ? classic >= industry : classic <= industry;
   const sOk = higherBetter ? sdr >= industry : sdr <= industry;
   const ratio = classic !== 0 ? Math.abs(sdr - classic) / Math.abs(classic) : Math.abs(sdr - classic);
-  if (sOk && !cOk) return "SDR_WIN_GAP";
+  if (sOk && !cOk) return "BENCH_WIN_GAP";
   if (sOk && cOk && ratio < 0.1) return "PARITY";
-  if (sOk && (!cOk || (higherBetter ? sdr > classic : sdr < classic))) return "SDR_WIN";
+  if (sOk && (!cOk || (higherBetter ? sdr > classic : sdr < classic))) return "BENCH_WIN";
   if (cOk && !sOk) return "CLASSIC_WIN";
   if (!cOk && !sOk) return "FAIL";
   return "CLASSIC_WIN";
@@ -309,7 +309,7 @@ async function runComparisons() {
     sdr: { label: "Hamming SDM", value: sdrRecallPct.toFixed(1), unit: "%" },
     industry: { label: "IND-FUZZY", value: INDUSTRY.fuzzyRecallMinPct, unit: "%" },
     verdict: cmpNum(classicRecallPct, sdrRecallPct, INDUSTRY.fuzzyRecallMinPct, true),
-    note: "Classic LIKE/exact fails on typos; SDR tolerates bit noise",
+    note: "Classic LIKE/exact fails on typos; Bench tolerates bit noise",
   });
 
   // CMP-MEM-03
@@ -325,7 +325,7 @@ async function runComparisons() {
     sdr: { label: "VSA unbind", value: vsaAcc.toFixed(1), unit: "%" },
     industry: { label: "IND-VSA-ACC", value: INDUSTRY.vsaAccuracyMinPct, unit: "%" },
     verdict: cmpNum(classicAcc, vsaAcc, INDUSTRY.vsaAccuracyMinPct, true),
-    note: "Classic: separate columns; SDR: single bound vector",
+    note: "Classic: separate columns; Bench: single bound vector",
   });
 
   // CMP-MEM-04
@@ -351,7 +351,7 @@ async function runComparisons() {
     classic: { label: "SQL JOIN chain", value: sqlMs.toFixed(2), unit: " ms" },
     sdr: { label: "VaCoAl", value: vacMs.toFixed(2), unit: " ms" },
     industry: { label: "speedup≥", value: INDUSTRY.graphSpeedupMin, unit: "×" },
-    verdict: speedup >= INDUSTRY.graphSpeedupMin ? "SDR_WIN" : "CLASSIC_WIN",
+    verdict: speedup >= INDUSTRY.graphSpeedupMin ? "BENCH_WIN" : "CLASSIC_WIN",
     note: `speedup=${speedup.toFixed(2)}×, sqlHits=${sqlHits}, vacHits=${vacHits}`,
   });
   pushRow({
@@ -359,7 +359,7 @@ async function runComparisons() {
     classic: { label: "SQL ms", value: sqlMs.toFixed(2), unit: " ms" },
     sdr: { label: "VaCoAl ms", value: vacMs.toFixed(2), unit: " ms" },
     industry: { label: "IND-GRAPH", value: INDUSTRY.graphMs, unit: " ms" },
-    verdict: vacMs <= INDUSTRY.graphMs && sqlMs <= INDUSTRY.graphMs ? "PARITY" : vacMs <= INDUSTRY.graphMs ? "SDR_WIN" : "FAIL",
+    verdict: vacMs <= INDUSTRY.graphMs && sqlMs <= INDUSTRY.graphMs ? "PARITY" : vacMs <= INDUSTRY.graphMs ? "BENCH_WIN" : "FAIL",
     note: "Both stacks under 500ms on 20k nodes",
   });
 
@@ -418,7 +418,7 @@ async function runComparisons() {
     classic: { label: "automation JSON", value: classicRulesJson, unit: " B" },
     sdr: { label: "DNF IF/THEN", value: uniqueRules.length, unit: " rules" },
     industry: { label: "min rules", value: 3, unit: "" },
-    verdict: uniqueRules.length >= 3 ? "SDR_WIN" : "FAIL",
+    verdict: uniqueRules.length >= 3 ? "BENCH_WIN" : "FAIL",
     note: `Sample: ${sampleRules.length > 100 ? sampleRules.slice(0, 100) + "…" : sampleRules}`,
   });
 
@@ -444,8 +444,8 @@ async function runComparisons() {
     classic: { label: "rules replace", value: classicAdaptSec.toFixed(4), unit: " s" },
     sdr: { label: "erase+seed", value: sdrAdaptSec.toFixed(4), unit: " s" },
     industry: { label: "correct≥", value: 120, unit: "/500" },
-    verdict: sdrAfter >= 120 ? "SDR_WIN" : "FAIL",
-    note: `SDR post-drift accuracy ${sdrAfter}/500`,
+    verdict: sdrAfter >= 120 ? "BENCH_WIN" : "FAIL",
+    note: `Bench post-drift accuracy ${sdrAfter}/500`,
   });
 
   // CMP-AI-01
@@ -468,7 +468,7 @@ async function runComparisons() {
     classic: { label: "RBAC misses", value: rbacMiss, unit: "" },
     sdr: { label: "surprisal detect", value: aiDetect, unit: "" },
     industry: { label: "FP≤", value: INDUSTRY.anomalyFpMaxPct, unit: "%" },
-    verdict: aiDetect > 0 && fpPct <= INDUSTRY.anomalyFpMaxPct ? "SDR_WIN_GAP" : "FAIL",
+    verdict: aiDetect > 0 && fpPct <= INDUSTRY.anomalyFpMaxPct ? "BENCH_WIN_GAP" : "FAIL",
     note: `FP=${fpPct.toFixed(2)}%; RBAC пропускает export вне часов`,
   });
 
@@ -481,7 +481,7 @@ async function runComparisons() {
     classic: { label: "CSPRNG only", value: csprng.toFixed(3), unit: " bits" },
     sdr: { label: hw.provider, value: hw.minEntropy.toFixed(3), unit: " bits" },
     industry: { label: "min", value: 6.5, unit: " bits" },
-    verdict: hw.minEntropy >= 6.5 ? "SDR_WIN" : "CLASSIC_WIN",
+    verdict: hw.minEntropy >= 6.5 ? "BENCH_WIN" : "CLASSIC_WIN",
     note: "Hardware entropy cascade vs software-only",
   });
 
@@ -495,7 +495,7 @@ async function runComparisons() {
     classic: { label: "none", value: "N/A", unit: "" },
     sdr: { label: "stub contract", value: stubOk ? "OK" : "FAIL", unit: "" },
     industry: { label: "daemon", value: "future", unit: "" },
-    verdict: stubOk ? "SDR_WIN_GAP" : "FAIL",
+    verdict: stubOk ? "BENCH_WIN_GAP" : "FAIL",
     note: "Production: no C++/Zig daemon yet",
   });
 
@@ -508,7 +508,7 @@ async function runComparisons() {
     classic: { label: "SQL COUNT entropy", value: classicStab.toFixed(3), unit: "" },
     sdr: { label: "CA Rule184 LST", value: ca.stability.toFixed(3), unit: "" },
     industry: { label: "IND-CA", value: INDUSTRY.caStabilityMin, unit: "" },
-    verdict: ca.stability >= INDUSTRY.caStabilityMin ? "SDR_WIN" : "FAIL",
+    verdict: ca.stability >= INDUSTRY.caStabilityMin ? "BENCH_WIN" : "FAIL",
     note: `CA bottleneck stage-${ca.bottleneck}`,
   });
 
@@ -525,7 +525,7 @@ async function runComparisons() {
     classic: { label: "array slice+join", value: listClassic.elapsedMs.toFixed(3), unit: " ms" },
     sdr: { label: "SDM recall×50", value: sdrListMs.toFixed(3), unit: " ms" },
     industry: { label: "IND-API-LIST", value: INDUSTRY.apiListMs, unit: " ms" },
-    verdict: sdrRecallPerOp <= INDUSTRY.apiListMs ? "SDR_WIN" : listClassic.elapsedMs <= INDUSTRY.apiListMs ? "PARITY" : "FAIL",
+    verdict: sdrRecallPerOp <= INDUSTRY.apiListMs ? "BENCH_WIN" : listClassic.elapsedMs <= INDUSTRY.apiListMs ? "PARITY" : "FAIL",
     note: `SDM ${sdrRecallPerOp.toFixed(3)} ms/recall (инвертированный индекс); classic pagination ${listClassic.elapsedMs.toFixed(3)} ms`,
   });
 
@@ -554,7 +554,7 @@ async function runComparisons() {
     classic: { label: "rules JSON", value: classicRulesJson, unit: " B" },
     sdr: { label: "FPTM", value: modelBytes, unit: " B" },
     industry: { label: "IND-MODEL", value: INDUSTRY.modelMaxBytes, unit: " B" },
-    verdict: modelBytes <= INDUSTRY.modelMaxBytes ? "SDR_WIN" : "FAIL",
+    verdict: modelBytes <= INDUSTRY.modelMaxBytes ? "BENCH_WIN" : "FAIL",
     note: "Edge deploy target ≤51.2 KB",
   });
 
@@ -564,14 +564,14 @@ async function runComparisons() {
     classic: { label: "RBAC only", value: "N/A", unit: "" },
     sdr: { label: "surprisal", value: fpPct.toFixed(2), unit: "%" },
     industry: { label: "IND-ANOMALY", value: INDUSTRY.anomalyFpMaxPct, unit: "%" },
-    verdict: fpPct <= INDUSTRY.anomalyFpMaxPct ? "SDR_WIN_GAP" : "FAIL",
+    verdict: fpPct <= INDUSTRY.anomalyFpMaxPct ? "BENCH_WIN_GAP" : "FAIL",
     note: "UEBA/SOC standard ≤5% FP",
   });
 
   // CMP-CRM-02
   pushRow({
     id: "CMP-CRM-02", axis: "SLA reference",
-    classic: { label: "SDR CRM target", value: INDUSTRY.uptimePct, unit: "%" },
+    classic: { label: "CRM target", value: INDUSTRY.uptimePct, unit: "%" },
     sdr: { label: "same stack", value: INDUSTRY.uptimePct, unit: "%" },
     industry: { label: "SaaS SLA", value: INDUSTRY.uptimePct, unit: "%" },
     verdict: "PARITY",
@@ -581,7 +581,7 @@ async function runComparisons() {
 
 function printSummary() {
   section("СВОДКА");
-  const counts = { SDR_WIN: 0, SDR_WIN_GAP: 0, CLASSIC_WIN: 0, PARITY: 0, FAIL: 0 };
+  const counts = { BENCH_WIN: 0, BENCH_WIN_GAP: 0, CLASSIC_WIN: 0, PARITY: 0, FAIL: 0 };
   for (const r of rows) counts[r.verdict]++;
   log(`| Вердикт | Кол-во |`);
   log(`|---------|--------|`);
@@ -606,25 +606,25 @@ function printSummary() {
   mkdirSync(join(ROOT, "logs"), { recursive: true });
   const startedAt = new Date().toISOString();
   writeFileSync(LOG_FILE, [
-    "# Classic CRM vs SDR CRM — Comparison Report", "",
+    "# Classic CRM vs Advanced bench — Comparison Report", "",
     `| Поле | Значение |`, `|------|----------|`,
     `| Дата | ${startedAt} |`, `| Node | ${RUN_META.nodeVersion} |`,
     `| Git | ${RUN_META.gitCommit} |`, `| CPU | ${RUN_META.cpus} |`, `| RAM | ${RUN_META.ramGb} GB |`,
-    `| Classic | SDR CRM: PostgreSQL/PGlite, Drizzle, Hono REST, RBAC |`,
-    `| SDR | SDM, VSA, VaCoAl, FPTM, Surprisal, CA Rule184 |`, "",
+    `| Classic | CRM: PostgreSQL/PGlite, Drizzle, Hono REST, RBAC |`,
+    `| Bench | SDM, VSA, VaCoAl, FPTM, Surprisal, CA Rule184 |`, "",
     "## Industry Standards Reference", "",
     `| IND | Значение |`, `|-----|----------|`,
     ...Object.entries(INDUSTRY).map(([k, v]) => `| ${k} | ${v} |`), "",
     "## Comparison Matrix", "",
-    "| ID | Classic | SDR | Industry | Verdict | Note |",
+    "| ID | Classic | Bench | Industry | Verdict | Note |",
     "|----|---------|-----|----------|---------|------|",
   ].join("\n"));
 
   await runComparisons();
   printSummary();
 
-  const sdrWins = rows.filter((r) => r.verdict === "SDR_WIN" || r.verdict === "SDR_WIN_GAP").length;
-  log(`\n**Итог: SDR превосходит/готов (${sdrWins}/${rows.length} осей); production gap задокументирован.**`);
+  const sdrWins = rows.filter((r) => r.verdict === "BENCH_WIN" || r.verdict === "BENCH_WIN_GAP").length;
+  log(`\n**Итог: Bench превосходит/готов (${sdrWins}/${rows.length} осей); production gap задокументирован.**`);
   log(`\nФайл: ${LOG_FILE}`);
   console.log(`\n→ ${LOG_FILE}`);
   process.exit(0);

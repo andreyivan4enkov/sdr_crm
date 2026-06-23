@@ -15,6 +15,7 @@ import {
   isMarketingType, marketingWebhookUrl, MARKETING_CHANNEL_BY_TYPE,
 } from "../lib/marketing-meta.js";
 import { hasAnyPermission, hasPermission } from "../lib/permissions.js";
+import { invalidateYandexMarketingCache } from "../lib/yandex-cloud/marketing-context.js";
 
 const uid = () => crypto.randomUUID();
 
@@ -150,10 +151,12 @@ integrationRoutes.patch("/tilda", async (c) => {
   });
 
   return c.json({
-    integration: row,
+    integration: buildIntegrationView(row!, baseUrl),
     webhookUrl: endpoints.tildaWebhook,
-    webhookUrlWithSecret: webhookUrlWithSecret(endpoints.tildaWebhook, secret),
-    webhookSecret: secret,
+    ...(body.data.rotateSecret || !prev.webhookSecret ? {
+      webhookUrlWithSecret: webhookUrlWithSecret(endpoints.tildaWebhook, secret),
+      webhookSecret: secret,
+    } : {}),
   });
 });
 
@@ -189,7 +192,7 @@ integrationRoutes.patch("/telephony", async (c) => {
   if (body.data.callerId !== undefined) config.callerId = body.data.callerId;
   if (body.data.apiKey) config.apiKey = body.data.apiKey;
   if (body.data.aiEnabled !== undefined) config.aiEnabled = body.data.aiEnabled;
-  if (body.data.aiApiKey) config.aiApiKey = body.data.aiApiKey;
+  if (body.data.aiApiKey !== undefined) config.aiApiKey = body.data.aiApiKey;
   if (body.data.aiBaseUrl !== undefined) config.aiBaseUrl = body.data.aiBaseUrl;
   if (body.data.aiModel !== undefined) config.aiModel = body.data.aiModel;
   if (body.data.whisperModel !== undefined) config.whisperModel = body.data.whisperModel;
@@ -231,11 +234,13 @@ integrationRoutes.patch("/telephony", async (c) => {
   });
 
   return c.json({
-    integration: row,
+    integration: buildIntegrationView(row!, baseUrl),
     webhookUrl,
-    webhookUrlWithSecret: webhookUrlWithSecret(webhookUrl, secret),
-    beelineEventUrl: provider === "beeline" ? `${webhookUrl}/null?secret=${encodeURIComponent(secret)}` : undefined,
-    webhookSecret: secret,
+    ...(body.data.rotateSecret || !prev.webhookSecret ? {
+      webhookUrlWithSecret: webhookUrlWithSecret(webhookUrl, secret),
+      webhookSecret: secret,
+      beelineEventUrl: provider === "beeline" ? `${webhookUrl}/null?secret=${encodeURIComponent(secret)}` : undefined,
+    } : {}),
     sipGateway: config.sipGateway,
     provider,
     beelineSubscriptionId: config.beelineSubscriptionId || null,
@@ -333,6 +338,10 @@ async function patchMarketing(
 
   await syncChannelConnection(type, enabled);
 
+  if (type === "yandex_metrica" || type === "yandex_direct") {
+    invalidateYandexMarketingCache();
+  }
+
   const baseUrl = getPublicBaseUrl();
   const secret = config.webhookSecret as string | undefined;
   const user = c.get("user");
@@ -343,11 +352,11 @@ async function patchMarketing(
     meta: { enabled },
   });
 
-  const res: Record<string, unknown> = { integration: row };
+  const res: Record<string, unknown> = { integration: buildIntegrationView(row!, baseUrl) };
   if (type !== "yandex_metrica") {
     const url = marketingWebhookUrl(type, baseUrl);
     res.webhookUrl = url;
-    if (secret) {
+    if (secret && (fields.rotateSecret || !prev.webhookSecret)) {
       res.webhookUrlWithSecret = webhookUrlWithSecret(url, secret);
       res.webhookSecret = secret;
     }

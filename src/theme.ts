@@ -13,7 +13,7 @@ export const JB_BRAND = {
 } as const;
 
 export type ColorMode = "light" | "dark";
-export type UiSkin = "standard" | "neomorphism";
+export type UiSkin = "standard" | "neomorphism" | "glass";
 
 export type ThemeState = {
   colorMode: ColorMode;
@@ -38,7 +38,10 @@ export async function loadThemePrefs(
     get("jbr:brand"),
     get("sdr:uiSkin"),
   ]);
-  const skin: UiSkin = uiSkin === "neomorphism" ? "neomorphism" : "standard";
+  const skin: UiSkin =
+    uiSkin === "neomorphism" ? "neomorphism"
+      : uiSkin === "glass" ? "glass"
+        : "standard";
   if (colorMode === "light" || colorMode === "dark") {
     return { colorMode, brandOn: brand === "1" || brand === "true", uiSkin: skin };
   }
@@ -62,6 +65,22 @@ export type ThemeTokens = {
 };
 
 export function getTokens({ colorMode, brandOn, uiSkin }: ThemeState): ThemeTokens {
+  if (uiSkin === "glass") {
+    return {
+      app: "glass-app",
+      surface: "glass-surface",
+      soft: "glass-soft",
+      border: "glass-border",
+      text: "glass-text",
+      muted: "glass-muted",
+      subtle: "glass-subtle",
+      input: "glass-input",
+      hover: "glass-hover",
+      chip: "glass-chip",
+      board: "glass-board",
+      divide: "glass-divide",
+    };
+  }
   if (uiSkin === "neomorphism") {
     if (colorMode === "dark") {
       return {
@@ -101,9 +120,9 @@ export function getTokens({ colorMode, brandOn, uiSkin }: ThemeState): ThemeToke
       soft: "bg-slate-800",
       border: "border-slate-700",
       text: "text-slate-100",
-      muted: "text-slate-400",
-      subtle: "text-slate-300",
-      input: "bg-slate-900 border-slate-700 text-slate-100 placeholder-slate-500",
+      muted: "text-slate-300",
+      subtle: "text-slate-200",
+      input: "bg-slate-900 border-slate-700 text-slate-100 placeholder-slate-400",
       hover: "hover:bg-slate-700",
       chip: "bg-slate-700 text-slate-200",
       board: "bg-slate-800/50",
@@ -132,8 +151,8 @@ export function getTokens({ colorMode, brandOn, uiSkin }: ThemeState): ThemeToke
     soft: "bg-stone-50",
     border: "border-stone-200",
     text: "text-slate-700",
-    muted: "text-slate-400",
-    subtle: "text-slate-500",
+    muted: "text-slate-500",
+    subtle: "text-slate-600",
     input: "bg-white border-stone-200 text-slate-700 placeholder-slate-400",
     hover: "hover:bg-stone-100",
     chip: "bg-stone-100 text-slate-600",
@@ -143,6 +162,9 @@ export function getTokens({ colorMode, brandOn, uiSkin }: ThemeState): ThemeToke
 }
 
 export function topBarBg(theme: ThemeState, scrolled: boolean): string {
+  if (theme.uiSkin === "glass") {
+    return scrolled ? "glass-topbar glass-topbar--scrolled" : "glass-topbar";
+  }
   if (theme.uiSkin === "neomorphism") {
     return scrolled ? "neo-topbar neo-topbar--scrolled" : "neo-topbar";
   }

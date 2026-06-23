@@ -1,6 +1,6 @@
-# Classic CRM vs SDR CRM — сравнение
+# Classic CRM vs Advanced bench — сравнение
 
-Парное сопоставление **классической SDR CRM** (PostgreSQL, Drizzle, Hono, RBAC) и **SDR-методов** (SDM, VSA, VaCoAl, FPTM, Surprisal, CA) по отраслевым эталонам.
+Парное сопоставление **классической CRM** (PostgreSQL, Drizzle, Hono, RBAC) и **векторных методов** (SDM, VSA, VaCoAl, FPTM, Surprisal, CA) по отраслевым эталонам.
 
 ## Запуск
 
@@ -12,7 +12,7 @@ npm run bench:full      # оба прогона
 
 | Лог | Содержание |
 |-----|------------|
-| `logs/comparison.log` | Парные метрики Classic vs SDR |
+| `logs/comparison.log` | Парные метрики Classic vs Bench |
 | `logs/stress-report.log` | Стресс-тест p50/p95/p99, scorecard |
 
 ## Документация
@@ -21,7 +21,7 @@ npm run bench:full      # оба прогона
 |------|------------|
 | [PLAN.md](./PLAN.md) | Детальный план, матрица осей, критерии вердикта |
 | [CHECKLIST.md](./CHECKLIST.md) | Пошаговый чеклист фаз 0–5 |
-| [logs/comparison.log](./logs/comparison.log) | **Единый отчёт** (classic / SDR / industry) |
+| [logs/comparison.log](./logs/comparison.log) | **Единый отчёт** (classic / bench / industry) |
 
 ## Оси сравнения (21 метрика)
 
@@ -34,9 +34,9 @@ npm run bench:full      # оба прогона
 
 | Код | Значение |
 |-----|----------|
-| `SDR_WIN` | SDR лучше classic и проходит industry |
-| `SDR_WIN_GAP` | SDR лучше в bench, **не в production** |
-| `CLASSIC_WIN` | Classic лучше или SDR не проходит эталон |
+| `BENCH_WIN` | Bench лучше classic и проходит industry |
+| `BENCH_WIN_GAP` | Bench лучше в bench, **не в production** |
+| `CLASSIC_WIN` | Classic лучше или Bench не проходит эталон |
 | `PARITY` | Паритет (<10% разница) |
 | `FAIL` | Оба не проходят industry |
 

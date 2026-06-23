@@ -2,8 +2,10 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Shield, Check } from "lucide-react";
 import {
   api, type Role,
-  PERMISSION_GROUPS, permissionLabel, isFullAccess,
+  getPermissionGroups, permissionLabel, isFullAccess,
 } from "../../api/client";
+import { useI18n } from "@sdr-crm/i18n/react";
+import { useAuth } from "../../context/AuthContext";
 
 type BtnProps = {
   children: React.ReactNode;
@@ -25,10 +27,14 @@ export function AdminRoles({
   Btn: React.FC<BtnProps>;
   TInput: React.FC<{ t: Record<string, string>; value: string; onChange: (v: string) => void; placeholder?: string }>;
 }) {
+  const { locale } = useI18n();
+  const { refresh } = useAuth();
+  const permissionGroups = useMemo(() => getPermissionGroups(locale), [locale]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [draft, setDraft] = useState<Record<string, string[]>>({});
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [f, setF] = useState({ name: "", label: "", permissions: [] as string[] });
 
   const load = useCallback(async () => {
@@ -68,6 +74,7 @@ export function AdminRoles({
 
   async function saveAll() {
     setSaving(true);
+    setSaveError("");
     try {
       for (const role of roles) {
         if (isFullAccess(role.permissions || [])) continue;
@@ -77,6 +84,9 @@ export function AdminRoles({
         await api.updateRole(role.id, { permissions: perms });
       }
       await load();
+      await refresh();
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Не удалось сохранить права");
     } finally {
       setSaving(false);
     }
@@ -88,6 +98,7 @@ export function AdminRoles({
     <div className="space-y-4">
       <div className="flex flex-wrap justify-between items-center gap-3">
         <p className={`text-sm ${t.muted}`}>Матрица прав по ролям — отметьте нужные действия и нажмите «Сохранить»</p>
+        {saveError && <p className="text-sm text-rose-600">{saveError}</p>}
         <div className="flex flex-wrap gap-2">
           {dirty && (
             <Btn t={t} onClick={saveAll} className="text-sm">
@@ -116,14 +127,14 @@ export function AdminRoles({
           <div className={`mt-4 overflow-x-auto rounded-lg border ${t.border}`}>
             <table className="w-full text-sm min-w-[320px]">
               <tbody>
-                {PERMISSION_GROUPS.map((g) => (
+                {permissionGroups.map((g) => (
                   <Fragment key={g.title}>
                     <tr className={t.soft}>
                       <td colSpan={2} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">{g.title}</td>
                     </tr>
                     {g.permissions.map((p) => (
                       <tr key={p} className={`border-t ${t.border}`}>
-                        <td className="px-3 py-2 text-xs">{permissionLabel(p)}</td>
+                        <td className="px-3 py-2 text-xs">{permissionLabel(p, locale)}</td>
                         <td className="px-3 py-2 text-center w-16">
                           <input
                             type="checkbox"
@@ -178,7 +189,7 @@ export function AdminRoles({
               </tr>
             </thead>
             <tbody>
-              {PERMISSION_GROUPS.map((g) => (
+              {permissionGroups.map((g) => (
                 <Fragment key={g.title}>
                   <tr className="bg-teal-50/80 dark:bg-teal-500/10">
                     <td
@@ -191,7 +202,7 @@ export function AdminRoles({
                   {g.permissions.map((perm) => (
                     <tr key={perm} className={`border-t ${t.border} hover:bg-stone-50/50 dark:hover:bg-slate-800/40`}>
                       <td className={`px-3 py-2.5 text-xs sticky left-0 z-[1] ${t.surface}`}>
-                        {permissionLabel(perm)}
+                        {permissionLabel(perm, locale)}
                       </td>
                       {roles.map((r) => {
                         const full = isFullAccess(draft[r.id] || r.permissions || []);
@@ -210,7 +221,7 @@ export function AdminRoles({
                                 disabled={locked}
                                 onChange={(e) => setPerm(r.id, perm, e.target.checked)}
                                 className="w-4 h-4 accent-teal-600 disabled:opacity-50"
-                                aria-label={`${r.label}: ${permissionLabel(perm)}`}
+                                aria-label={`${r.label}: ${permissionLabel(perm, locale)}`}
                               />
                             )}
                           </td>

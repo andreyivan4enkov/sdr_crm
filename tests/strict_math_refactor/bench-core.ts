@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Strict Math Refactor — монолитный стенд бенчмарков CRM.
- * SDR = Sparse Distributed Representations.
+ * Bench: разреженные векторные представления.
  * Запуск: npx tsx tests/strict_math_refactor/bench-core.ts [CODE]
  * Логи: tests/strict_math_refactor/logs/bench.log (один файл)
  */
@@ -173,11 +173,11 @@ function estimateMinEntropy(bytes: Uint8Array) {
 }
 
 // ─── SQL baseline (MEM-1.4) ────────────────────────────────────────────────────
-type SqlRow = { leadId: string; stage: string; pipeline: string; channel: string; realtor: string; orgUnit: string };
+type SqlRow = { leadId: string; stage: string; pipeline: string; channel: string; dealManager: string; orgUnit: string };
 function buildGraph(n: number): SqlRow[] {
   return Array.from({ length: n }, (_, i) => ({
     leadId: `lead-${i}`, stage: `stage-${i % 20}`, pipeline: `pipe-${i % 5}`,
-    channel: `ch-${i % 8}`, realtor: `realtor-${i % 50}`, orgUnit: `org-${i % 10}`,
+    channel: `ch-${i % 8}`, dealManager: `dealManager-${i % 50}`, orgUnit: `org-${i % 10}`,
   }));
 }
 function sqlFiveHop(rows: SqlRow[], leadId: string) {
@@ -187,7 +187,7 @@ function sqlFiveHop(rows: SqlRow[], leadId: string) {
   const s1 = hop("stage", lead.stage);
   const s2 = s1 ? hop("pipeline", s1.pipeline) : undefined;
   const s3 = s2 ? hop("channel", s2.channel) : undefined;
-  const s4 = s3 ? hop("realtor", s3.realtor) : undefined;
+  const s4 = s3 ? hop("deal_manager", s3.dealManager) : undefined;
   return s4 ? hop("orgUnit", s4.orgUnit) : undefined;
 }
 function benchSql(rows: SqlRow[], queries: string[]) {
@@ -295,7 +295,7 @@ const BENCHMARKS: Record<string, { title: string; run: BenchFn }> = {
       const status = exponential ? "DISQUALIFIED" : passC && passF ? "PASS" : "FAIL";
       return {
         code: "MEM-1.1", title: "Ёмкость и хранение (SDM)", status, durationMs: 0,
-        methodology: "Sparse Distributed Memory: инвертированный индекс активных битов SDR, упакованный Hamming (popcount), коллизии и забывание.",
+        methodology: "Sparse Distributed Memory: инвертированный индекс активных битов вектора, упакованный Hamming (popcount), коллизии и забывание.",
         metrics: [
           { name: "Записей", value: cfg.recordCount, ok: true },
           { name: "Коллизии", value: collisionRate.toFixed(3), unit: "%", threshold: `≤ ${cfg.collisionThresholdPct}%`, ok: passC },

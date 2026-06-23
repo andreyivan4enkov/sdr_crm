@@ -608,7 +608,7 @@ export function RadialSequencer({ colorMode, queue: initialQueue, sound = true, 
             {showPriority && (
               <div style={{ marginTop: 18, padding: "13px 15px", borderRadius: 18, background: T.bg, boxShadow: inset(T, 3, 7) }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.5, color: T.dim }}>SDR-ПРИОРИТЕТ</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.5, color: T.dim }}>ПРИОРИТЕТ</span>
                   <span style={{ fontSize: 13, fontWeight: 800, color: current.statusColor }}>{current.priority}</span>
                 </div>
                 <div style={{ height: 7, borderRadius: 5, background: T.track, boxShadow: inset(T, 1, 3), overflow: "hidden" }}>

@@ -1,14 +1,14 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { rateLimit } from "../../middleware/rateLimit.js";
+import { rateLimitAsync } from "../../middleware/rateLimit.js";
 import { getClientIp } from "../../lib/clientIp.js";
 import { db } from "../../db/index.js";
-import { integrations, stages, channels, leads, leadNotes, tasks, pipelines } from "../../db/schema.js";
-import { runStageAutomations } from "../../lib/automations.js";
-import { persistAutomationSideEffects } from "../../lib/apply-stage-automations.js";
+import { integrations, stages, channels, leads, leadNotes, tasks, pipelines, crmMeta } from "../../db/schema.js";
+import { triggerBlueprintsForStage } from "../../lib/blueprint/executor.js";
 import { broadcastToAll } from "../../lib/events.js";
-import { realtors } from "../../db/schema.js";
+import { dealManagers } from "../../db/schema.js";
 import { writeAudit } from "../../lib/audit.js";
+import { verifyWebhookAuth } from "../../lib/webhook-secret.js";
 import {
   bodyFieldKeys, isTildaTestPing, mapTildaToLead, readTildaWebhookBody,
 } from "../../lib/tilda-parse.js";
@@ -34,7 +34,7 @@ export const tildaWebhook = new Hono();
 
 tildaWebhook.post("/", async (c) => {
   const ip = getClientIp(c);
-  if (!rateLimit(`webhook-tilda:${ip}`, 60, 60_000)) {
+  if (!(await rateLimitAsync(`webhook-tilda:${ip}`, 60, 60_000))) {
     return c.json({ error: "Too many requests" }, 429);
   }
   const secret = c.req.header("X-Webhook-Secret") || c.req.query("secret");
@@ -46,11 +46,16 @@ tildaWebhook.post("/", async (c) => {
     fieldMapping?: Record<string, string>;
     consentField?: string;
   };
-  if (!secret || secret !== config.webhookSecret) {
-    return c.json({ error: "Invalid webhook secret" }, 401);
-  }
 
   const raw = await c.req.text();
+  const check = verifyWebhookAuth(
+    secret, raw, c.req.header("X-Webhook-Signature"), config.webhookSecret,
+    { signatureOptional: true },
+  );
+  if (!check.ok) {
+    return c.json({ error: check.error }, check.status);
+  }
+
   const contentType = c.req.header("content-type") || "";
   const body = await readTildaWebhookBody(raw, contentType);
 
@@ -61,9 +66,18 @@ tildaWebhook.post("/", async (c) => {
   const mapping = { ...TILDA_DEFAULT_MAPPING, ...config.fieldMapping };
   const { leadData, custom } = mapTildaToLead(body, mapping);
 
+  const tranId = getBodyField(body, "tranid");
+  if (tranId) {
+    const metaKey = `tilda_tran:${tranId}`;
+    const [seen] = await db.select().from(crmMeta).where(eq(crmMeta.key, metaKey)).limit(1);
+    if (seen) {
+      const leadId = (seen.value as { leadId?: string }).leadId;
+      return c.json({ ok: true, duplicate: true, leadId });
+    }
+  }
+
   const meta: string[] = [];
   const formId = getBodyField(body, "formid");
-  const tranId = getBodyField(body, "tranid");
   if (formId) meta.push(`форма Tilda: ${formId}`);
   if (tranId) meta.push(`заявка: ${tranId}`);
 
@@ -96,6 +110,11 @@ tildaWebhook.post("/", async (c) => {
     pdConsentAt: consentNow,
   }).returning();
 
+  if (tranId) {
+    await db.insert(crmMeta).values({ key: `tilda_tran:${tranId}`, value: { leadId: lead.id } })
+      .onConflictDoNothing();
+  }
+
   await writeAudit({
     action: "webhook.tilda",
     entityType: "lead",
@@ -110,22 +129,7 @@ tildaWebhook.post("/", async (c) => {
     },
   });
 
-  const allChannels = await db.select().from(channels);
-  const allRealtors = await db.select().from(realtors);
-  const allStages = await db.select({ id: stages.id, label: stages.label, pipelineId: stages.pipelineId }).from(stages);
-  const stage = firstStage!;
-  const result = runStageAutomations(
-    stage.automations || [],
-    stage,
-    lead,
-    allChannels,
-    allRealtors,
-    allStages,
-  );
-  const autoPatch = await persistAutomationSideEffects(lead.id, lead, result);
-  if (Object.keys(autoPatch).length) {
-    await db.update(leads).set({ ...autoPatch, updatedAt: new Date() }).where(eq(leads.id, lead.id));
-  }
+  void triggerBlueprintsForStage(lead.id, firstStage!.id, firstStage!.pipelineId).catch(() => {});
 
   broadcastToAll("lead_created", { lead });
   return c.json({ ok: true, leadId: lead.id });

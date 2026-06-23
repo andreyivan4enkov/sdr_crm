@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { users, roles, profiles, orgUnits } from "../db/schema.js";
 import { verifyToken, getCookieName } from "../lib/auth.js";
-import { hasPermission, hasAnyPermission } from "../lib/permissions.js";
+import { hasPermission, hasAnyPermission, normalizePermissions } from "../lib/permissions.js";
 import type { AuthUser } from "../db/schema.js";
 
 export type AppEnv = {
@@ -50,7 +50,7 @@ async function loadUser(userId: string): Promise<AuthUser | null> {
     roleId: r.roleId,
     roleName: r.roleName,
     roleLabel: r.roleLabel,
-    permissions: (r.permissions as string[]) || [],
+    permissions: normalizePermissions(r.permissions),
     orgUnitName: r.orgUnitName,
     profile: r.profileName
       ? {
@@ -70,9 +70,8 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (!token) return c.json({ error: "Unauthorized" }, 401);
   try {
     const payload = await verifyToken(token);
-    if (payload.status !== "active") return c.json({ error: "Account not active" }, 403);
     const user = await loadUser(payload.sub);
-    if (!user) return c.json({ error: "User not found" }, 401);
+    if (!user || user.status !== "active") return c.json({ error: "Account not active" }, 403);
     c.set("user", user);
     await next();
   } catch {
@@ -85,10 +84,8 @@ export const optionalAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (token) {
     try {
       const payload = await verifyToken(token);
-      if (payload.status === "active") {
-        const user = await loadUser(payload.sub);
-        if (user) c.set("user", user);
-      }
+      const user = await loadUser(payload.sub);
+      if (user?.status === "active") c.set("user", user);
     } catch { /* ignore */ }
   }
   await next();

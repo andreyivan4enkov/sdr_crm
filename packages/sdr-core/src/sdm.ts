@@ -1,7 +1,7 @@
 import type { SdrCfg } from "./types.js";
 import { activeIndices, hammingPacked, packSdr } from "./hamming.js";
 
-/** SDM: инвертированный индекс по активным битам SDR + упакованный Hamming (popcount). */
+/** SDM: инвертированный индекс по активным битам + упакованный Hamming (popcount). */
 export class SparseDistributedMemory {
   private records = new Map<string, { packed: Uint32Array; active: number[] }>();
   private inverted = new Map<number, Set<string>>();

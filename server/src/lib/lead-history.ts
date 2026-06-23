@@ -22,7 +22,7 @@ const FIELD_LABELS: Record<string, string> = {
   statusId: "Этап",
   channelId: "Канал",
   assignedUserId: "Ответственный",
-  assignedRealtorId: "Риэлтор",
+  assignedDealManagerId: "Менеджер по сделкам",
   watchers: "Наблюдатели",
   custom: "Доп. поля",
   pdConsent: "Согласие на ПДн",
@@ -37,7 +37,7 @@ type LeadRow = {
   phone?: string | null;
   statusId?: string | null;
   assignedUserId?: string | null;
-  assignedRealtorId?: string | null;
+  assignedDealManagerId?: string | null;
   watchers?: string[] | null;
 };
 
@@ -49,7 +49,7 @@ type ResolveCtx = {
 function resolveValue(key: string, value: unknown, ctx: ResolveCtx): string {
   if (value === null || value === undefined || value === "") return "—";
   if (key === "statusId" && typeof value === "string") return ctx.stages?.get(value) || value;
-  if ((key === "assignedUserId" || key === "assignedRealtorId") && typeof value === "string") {
+  if ((key === "assignedUserId" || key === "assignedDealManagerId") && typeof value === "string") {
     return ctx.users?.get(value) || value;
   }
   if (key === "watchers" && Array.isArray(value)) {

@@ -4,10 +4,11 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: crm
-      POSTGRES_PASSWORD: crm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm}
       POSTGRES_DB: crm
     ports:
-      - "5432:5432"
+      # Только localhost — не открывать PostgreSQL в интернет
+      - "127.0.0.1:5432:5432"
     volumes:
       - crm_pg:/var/lib/postgresql/data
 

@@ -22,10 +22,14 @@ export function resolveStageId(
   return null;
 }
 
+export function leadStageId(l: Lead): string | undefined {
+  return l.statusId ?? undefined;
+}
+
 function leadsForStage(data: AnalyticsData, stageId?: string | null, fallback?: "first" | "won") {
   const id = resolveStageId(stageId, data.stages, fallback);
   if (!id) return data.leads;
-  return data.leads.filter((l) => l.status === id);
+  return data.leads.filter((l) => leadStageId(l) === id);
 }
 
 export function computeMetric(
@@ -42,12 +46,12 @@ export function computeMetric(
     case "stage_count": {
       const id = resolveStageId(stageId, data.stages, stageId ? undefined : "first");
       if (!id) return 0;
-      return data.leads.filter((l) => l.status === id).length;
+      return data.leads.filter((l) => leadStageId(l) === id).length;
     }
     case "deals_signed": {
       const id = resolveStageId(stageId, data.stages, "won");
       if (!id) return 0;
-      return data.leads.filter((l) => l.status === id).length;
+      return data.leads.filter((l) => leadStageId(l) === id).length;
     }
     case "money_sum": {
       if (!fieldId) return 0;

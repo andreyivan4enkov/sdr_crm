@@ -1,14 +1,22 @@
 import { useTheme } from "../context/ThemeProvider";
+import type { AuthUser } from "@sdr-crm/api-client";
 import type { ThemeTokens } from "../theme";
+import { CrmNavMenuSettings } from "../components/CrmNavMenuSettings";
+import { LanguageSettings } from "../components/LanguageSettings";
+import { useCrmNavPrefs } from "../hooks/useCrmNavPrefs";
 
-export function AppearanceSettings({ t }: { t: ThemeTokens }) {
+export function AppearanceSettings({ t, user }: { t: ThemeTokens; user: AuthUser }) {
   const { theme, setUiSkin, setColorMode } = useTheme();
+  const { prefs, setPrefs } = useCrmNavPrefs(user);
 
   return (
-    <section className={`rounded-2xl border p-5 space-y-5 ${t.border} ${t.surface}`}>
+    <div className="space-y-6">
+      <LanguageSettings theme={t} userId={user.id} />
+      <CrmNavMenuSettings t={t} user={user} prefs={prefs} setPrefs={setPrefs} />
+      <section className={`rounded-2xl border p-5 space-y-5 ${t.border} ${t.surface}`}>
       <div>
         <h3 className="font-semibold text-base">Оформление интерфейса</h3>
-        <p className={`text-sm mt-1 ${t.muted}`}>Неоморфный стиль ЦРМ — как в режиме потока (секвенсор).</p>
+        <p className={`text-sm mt-1 ${t.muted}`}>Стандартный, неоморфный стиль секвенсора или AIboard Glass.</p>
       </div>
 
       <div className="space-y-2">
@@ -31,6 +39,15 @@ export function AppearanceSettings({ t }: { t: ThemeTokens }) {
             }`}
           >
             ЦРМ Неоморфизм
+          </button>
+          <button
+            type="button"
+            onClick={() => setUiSkin("glass")}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition border ${
+              theme.uiSkin === "glass" ? "border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-300" : `${t.border} ${t.muted}`
+            }`}
+          >
+            AIboard Glass
           </button>
         </div>
       </div>
@@ -58,6 +75,7 @@ export function AppearanceSettings({ t }: { t: ThemeTokens }) {
           </button>
         </div>
       </div>
-    </section>
+      </section>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-# CHANGELOG — SDR CRM v3.3.0
+# CHANGELOG — CRM v3.3.0
 
 Дата: 2026-06-23
 

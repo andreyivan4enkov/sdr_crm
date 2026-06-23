@@ -90,7 +90,7 @@ function mapLead(lead: Lead & { status?: string }, stages: Stage[], channels: Cr
   const type = inferLeadEntityType(lead, stages);
   const stageId = lead.status ?? lead.statusId ?? "";
   const st = statusColorForLead(type, stageId, stages);
-  const channel = channels.find((c) => c.id === lead.channelId)?.label ?? "Канал не указан";
+  const channel = channels.find((c) => c.id === lead.channelId)?.name ?? "Канал не указан";
   const sdrBits = vecFromSeeds(
     `lead:${lead.id}`,
     `stage:${stageId}`,
@@ -201,7 +201,7 @@ function scoreItem(item: SequencerItem, stages: Stage[]): { priority: number; re
   return { priority: Math.min(99, priority), reason: "Плановая активность в потоке" };
 }
 
-/** SDR-Router: сектор резонирует только если совпадает с вектором сущности */
+/** Router: сектор резонирует только если совпадает с вектором сущности */
 export function sectorResonates(item: SequencerItem, sector: SectorKey): boolean {
   if (sector === "interact") {
     if (item.type === "doc") return item.interact.kind === "view";

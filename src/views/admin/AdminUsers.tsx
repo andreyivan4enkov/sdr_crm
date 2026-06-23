@@ -7,8 +7,8 @@ export function AdminUsers({ t, Btn, user }: {
   user: { permissions?: string[] };
   Btn: React.FC<{ children: React.ReactNode; onClick: () => void; t: Record<string, string>; variant?: string; className?: string }>;
 }) {
-  const canManageUsers = hasPermission(user, "users.manage");
-  const canInvite = hasPermission(user, "users.invite") || canManageUsers;
+  const canManageUsers = hasPermission(user as import("../../api/client").AuthUser, "users.manage");
+  const canInvite = hasPermission(user as import("../../api/client").AuthUser, "users.invite") || canManageUsers;
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -96,7 +96,7 @@ export function AdminUsers({ t, Btn, user }: {
                           </select>
                           <Btn t={t} onClick={async () => {
                             const sel = document.getElementById(`role-${u.id}`) as HTMLSelectElement;
-                            await api.approveUser(u.id, sel?.value);
+                            await api.approveUser(u.id, { roleId: sel?.value || undefined });
                             load();
                           }}><Check className="w-4 h-4" /> Подтвердить</Btn>
                           <Btn t={t} variant="ghost" onClick={async () => { await api.rejectUser(u.id); load(); }}><X className="w-4 h-4" /></Btn>

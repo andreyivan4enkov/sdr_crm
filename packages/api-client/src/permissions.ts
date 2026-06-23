@@ -21,19 +21,19 @@ export function normalizeLead(l: import("./types.js").Lead) {
 
 type LeadAssignee = {
   assignedUserId?: string | null;
-  assignedRealtorId?: string | null;
+  assignedDealManagerId?: string | null;
 };
 
 export function canEditLead(
   user: AuthUser | null,
   lead: LeadAssignee & { watchers?: string[] | null },
-  userRealtorId?: string | null,
+  userDealManagerId?: string | null,
 ) {
   if (!user) return false;
   if (hasPermission(user, "leads.write")) return true;
   if ((lead.watchers || []).includes(user.id)) return true;
   if (lead.assignedUserId === user.id) return true;
-  if (userRealtorId && lead.assignedRealtorId === userRealtorId) return true;
+  if (userDealManagerId && lead.assignedDealManagerId === userDealManagerId) return true;
   return false;
 }
 

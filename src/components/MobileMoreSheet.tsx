@@ -1,28 +1,20 @@
-import type { ComponentType } from "react";
-import { X, Users, Settings, ScrollText, Smartphone, Phone } from "lucide-react";
-import type { AuthUser } from "@sdr-crm/api-client";
-import { hasPermission } from "@sdr-crm/api-client";
-
-type NavItem = { k: string; label: string; icon: ComponentType<{ className?: string }> };
+import { X, Smartphone } from "lucide-react";
+import type { CrmNavItem } from "../lib/crm-nav";
+import { MOBILE_PRIMARY_COUNT } from "./MobileCrmNav";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   crmView: string;
   setCrmView: (view: string) => void;
-  user: AuthUser;
+  nav: CrmNavItem[];
   t: { surface: string; border: string; text: string; muted: string; hover: string; divide: string };
 };
 
-export function MobileMoreSheet({ open, onClose, crmView, setCrmView, user, t }: Props) {
+export function MobileMoreSheet({ open, onClose, crmView, setCrmView, nav, t }: Props) {
   if (!open) return null;
 
-  const items: NavItem[] = [
-    { k: "team", label: "Сотрудники", icon: Users },
-  ];
-  items.push({ k: "settings", label: "Настройки", icon: Settings });
-  if (hasPermission(user, "calls.view")) items.push({ k: "calls", label: "Звонки", icon: Phone });
-  if (hasPermission(user, "audit.view")) items.push({ k: "audit", label: "Журнал", icon: ScrollText });
+  const items = nav.slice(MOBILE_PRIMARY_COUNT);
 
   function pick(k: string) {
     setCrmView(k);
@@ -45,6 +37,9 @@ export function MobileMoreSheet({ open, onClose, crmView, setCrmView, user, t }:
               Android (Chrome): меню ⋮ → «Установить приложение».
             </p>
           </div>
+          {items.length === 0 && (
+            <p className={`px-4 py-6 text-sm text-center ${t.muted}`}>Все разделы уже в нижней панели.</p>
+          )}
           {items.map((n) => (
             <button
               key={n.k}

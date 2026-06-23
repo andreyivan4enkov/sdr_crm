@@ -52,7 +52,7 @@ type Ctx = {
   stages: Stage[];
   channels: Channel[];
   employees: TeamMember[];
-  realtors: { id: string; name: string; userId?: string | null }[];
+  dealManagers: { id: string; name: string; userId?: string | null }[];
   fields: Field[];
 };
 
@@ -111,7 +111,7 @@ export function leadCellText(lead: LeadRow, col: LeadColumnId, ctx: Ctx): string
     case "source": return lead.source || "";
     case "comment": return lead.comment || "";
     case "stage": return ctx.stages.find((s) => s.id === (lead.status || lead.statusId))?.label || "";
-    case "responsible": return leadResponsibleMember(lead, ctx.employees, ctx.realtors)?.name || "";
+    case "responsible": return leadResponsibleMember(lead, ctx.employees, ctx.dealManagers)?.name || "";
     case "channel": return channelName(lead, ctx.channels);
     case "createdAt": return lead.createdAt || "";
     case "updatedAt": return lead.updatedAt || "";
@@ -120,7 +120,7 @@ export function leadCellText(lead: LeadRow, col: LeadColumnId, ctx: Ctx): string
       if (!f) return "";
       const raw = (lead.custom || {})[f.id] || "";
       if (f.type === "employee") {
-        return ctx.realtors.find((r) => r.id === raw)?.name || raw;
+        return ctx.dealManagers.find((r) => r.id === raw)?.name || raw;
       }
       if (f.type === "money" && raw) return `${raw} ₽`;
       return raw;

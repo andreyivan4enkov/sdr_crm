@@ -6,15 +6,15 @@ export function memberById(members: TeamMember[], id?: string | null) {
 }
 
 export function leadResponsibleMember(
-  lead: { assignedUserId?: string | null; assignedRealtorId?: string | null },
+  lead: { assignedUserId?: string | null; assignedDealManagerId?: string | null },
   members: TeamMember[],
-  realtors: { id: string; name: string; userId?: string | null }[],
+  dealManagers: { id: string; name: string; userId?: string | null }[],
 ) {
   const byUser = memberById(members, lead.assignedUserId);
   if (byUser) return byUser;
-  const realtor = realtors.find((r) => r.id === lead.assignedRealtorId);
-  if (realtor?.userId) return memberById(members, realtor.userId);
-  if (realtor) return { id: realtor.userId || realtor.id, name: realtor.name, avatar: null };
+  const dealManager = dealManagers.find((r) => r.id === lead.assignedDealManagerId);
+  if (dealManager?.userId) return memberById(members, dealManager.userId);
+  if (dealManager) return { id: dealManager.userId || dealManager.id, name: dealManager.name, avatar: null };
   return undefined;
 }
 

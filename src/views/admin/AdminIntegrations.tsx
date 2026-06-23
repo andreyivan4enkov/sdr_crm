@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Globe, Phone, Copy, RefreshCw, Shield, Code, Check, Link2, Power, Sparkles } from "lucide-react";
+import { Globe, Phone, Copy, RefreshCw, Shield, Code, Check, Link2, Power } from "lucide-react";
+import { UniversalConnectorsPanel } from "./UniversalConnectorsPanel";
 import { api } from "../../api/client";
 import type { Integration, IntegrationEndpoints } from "@sdr-crm/api-client";
 
@@ -30,7 +31,7 @@ function CopyBlock({ title, hint, value, t }: { title: string; hint: string; val
         <>
           <code className="block mt-3 text-xs break-all leading-relaxed select-all">{value}</code>
           <button type="button" onClick={copy}
-            className="mt-3 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition">
+            className="bio-btn-primary mt-3 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium transition">
             {ok ? <><Check className="w-4 h-4" /> Скопировано</> : <><Copy className="w-4 h-4" /> Скопировать</>}
           </button>
         </>
@@ -69,7 +70,16 @@ function StatusBadge({ enabled }: { enabled: boolean }) {
   );
 }
 
-export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, string>; Btn: React.FC<BtnProps>; onSaved?: () => void }) {
+export type AdminIntegrationSection = "all" | "tilda" | "telephony" | "connectors" | "public_api";
+
+export function AdminIntegrations({
+  t, Btn, onSaved, section = "all",
+}: {
+  t: Record<string, string>;
+  Btn: React.FC<BtnProps>;
+  onSaved?: () => void;
+  section?: AdminIntegrationSection;
+}) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -87,12 +97,6 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
   const [callerId, setCallerId] = useState("");
   const [telUrl, setTelUrl] = useState("");
   const [telUrlSecret, setTelUrlSecret] = useState("");
-  const [aiEnabled, setAiEnabled] = useState(false);
-  const [aiApiKey, setAiApiKey] = useState("");
-  const [aiBaseUrl, setAiBaseUrl] = useState("https://api.openai.com/v1");
-  const [aiModel, setAiModel] = useState("gpt-4o-mini");
-  const [autoTranscribe, setAutoTranscribe] = useState(true);
-  const [autoFillLead, setAutoFillLead] = useState(false);
   const [recordingAuthHeader, setRecordingAuthHeader] = useState("");
   const [attachActiveDeal, setAttachActiveDeal] = useState(true);
   const [createOnUnknown, setCreateOnUnknown] = useState(true);
@@ -128,11 +132,6 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
         setAttachActiveDeal(tel.config?.callAttachActiveDeal !== false);
         setCreateOnUnknown(tel.config?.createLeadOnUnknownCall !== false);
         setIgnorePhones(Array.isArray(tel.config?.ignorePhones) ? (tel.config?.ignorePhones as string[]).join("\n") : "");
-        setAiEnabled(Boolean(tel.config?.aiEnabled));
-        setAiBaseUrl(String(tel.config?.aiBaseUrl || "https://api.openai.com/v1"));
-        setAiModel(String(tel.config?.aiModel || "gpt-4o-mini"));
-        setAutoTranscribe(tel.config?.autoTranscribe !== false);
-        setAutoFillLead(Boolean(tel.config?.autoFillLead));
         setRecordingAuthHeader(String(tel.config?.recordingAuthHeader || ""));
       }
     } catch (e) {
@@ -188,18 +187,12 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
         provider: p,
         sipGateway,
         callerId,
-        aiEnabled,
-        aiBaseUrl,
-        aiModel,
-        autoTranscribe,
-        autoFillLead,
         recordingAuthHeader,
         callAttachActiveDeal: attachActiveDeal,
         createLeadOnUnknownCall: createOnUnknown,
         ignorePhones: ignorePhones.split("\n").map((s) => s.trim()).filter(Boolean),
       };
       if (apiKey.trim()) body.apiKey = apiKey.trim();
-      if (aiApiKey.trim()) body.aiApiKey = aiApiKey.trim();
       const r = await api.updateTelephony(body);
       setTelEnabled(r.integration.enabled);
       setTelProvider(r.provider || p);
@@ -208,7 +201,6 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
       if (r.beelineEventUrl) setBeelineEventUrl(r.beelineEventUrl);
       if (r.beelineSubscriptionId) setBeelineSubId(r.beelineSubscriptionId);
       setApiKey("");
-      setAiApiKey("");
       onSaved?.();
       await load();
     } catch (e) { setErr((e as Error).message); }
@@ -242,16 +234,22 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
 
   if (loading) return <p className={`text-sm ${t.muted}`}>Загрузка настроек…</p>;
 
+  const show = (part: AdminIntegrationSection | AdminIntegrationSection[]) =>
+    section === "all" || (Array.isArray(part) ? part.includes(section) : part === section);
+
   return (
     <div className="space-y-6">
       {err && <p className="text-sm text-rose-500 rounded-lg border border-rose-200 dark:border-rose-500/30 px-3 py-2">{err}</p>}
 
+      {show(["all", "tilda", "telephony", "public_api"]) && (
       <div className={`bio-card bio-glass-panel p-4 ${t.surface} ${t.border}`}>
         <h3 className="font-semibold flex items-center gap-2 text-sm"><Link2 className="w-4 h-4 text-teal-600" /> Базовый адрес CRM</h3>
         <p className={`text-xs ${t.muted} mt-1`}>Используется в webhook URL и публичном API</p>
         <code className="text-xs break-all block mt-2">{baseUrl}</code>
       </div>
+      )}
 
+      {show(["all", "tilda"]) && (
       <div className={`bio-card bio-glass-panel p-4 ${t.surface} border-amber-300/50`}>
         <h3 className="font-semibold flex items-center gap-2 text-sm"><Shield className="w-4 h-4 text-amber-600" /> 152-ФЗ</h3>
         <ul className={`text-xs ${t.subtle} mt-2 space-y-1 list-disc pl-4`}>
@@ -260,8 +258,9 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
           <li>Договор поручения с Tilda и оператором связи</li>
         </ul>
       </div>
+      )}
 
-      {/* TILDA */}
+      {show(["all", "tilda"]) && (
       <div className={`bio-card bio-glass-panel p-5 ${t.surface} ${t.border}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold flex items-center gap-2"><Globe className="w-4 h-4 text-teal-600" /> Tilda · example.com</h3>
@@ -295,8 +294,9 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
           <p className={`text-xs ${t.muted} mt-1`}>Поля example.com: Name, Phone, Date. Согласие: pd_consent</p>
         </details>
       </div>
+      )}
 
-      {/* TELEPHONY */}
+      {show(["all", "telephony"]) && (
       <div className={`bio-card bio-glass-panel p-5 ${t.surface} ${t.border}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold flex items-center gap-2"><Phone className="w-4 h-4 text-teal-600" /> Телефония / SIP</h3>
@@ -383,43 +383,14 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
         </div>
 
         <div className={`mt-5 pt-5 border-t ${t.border}`}>
-          <h4 className="font-medium text-sm flex items-center gap-2"><Sparkles className="w-4 h-4 text-violet-600" /> AI: расшифровка и автозаполнение</h4>
-          <p className={`text-xs ${t.muted} mt-1`}>OpenAI-совместимый API (Whisper + GPT). Ключ можно задать в <code>OPENAI_API_KEY</code> на сервере.</p>
-          <label className="flex items-center gap-2 mt-3 text-sm">
-            <input type="checkbox" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} className="accent-teal-600" />
-            Включить AI для записей звонков
-          </label>
-          <div className="grid sm:grid-cols-2 gap-4 mt-3">
-            <div>
-              <label className={`text-xs ${t.muted}`}>API-ключ AI</label>
-              <input value={aiApiKey} onChange={(e) => setAiApiKey(e.target.value)} placeholder={aiEnabled ? "sk-… (оставьте пустым, чтобы не менять)" : "sk-…"}
-                className={`w-full mt-1 rounded-lg border px-3 py-2 text-sm ${t.input}`} />
-            </div>
-            <div>
-              <label className={`text-xs ${t.muted}`}>Base URL API</label>
-              <input value={aiBaseUrl} onChange={(e) => setAiBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1"
-                className={`w-full mt-1 rounded-lg border px-3 py-2 text-sm ${t.input}`} />
-            </div>
-            <div>
-              <label className={`text-xs ${t.muted}`}>Модель для извлечения полей</label>
-              <input value={aiModel} onChange={(e) => setAiModel(e.target.value)} placeholder="gpt-4o-mini"
-                className={`w-full mt-1 rounded-lg border px-3 py-2 text-sm ${t.input}`} />
-            </div>
-            <div>
-              <label className={`text-xs ${t.muted}`}>Заголовок для скачивания записи</label>
-              <input value={recordingAuthHeader} onChange={(e) => setRecordingAuthHeader(e.target.value)} placeholder="Authorization: Bearer …"
-                className={`w-full mt-1 rounded-lg border px-3 py-2 text-sm ${t.input}`} />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-4 mt-3 text-sm">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={autoTranscribe} onChange={(e) => setAutoTranscribe(e.target.checked)} className="accent-teal-600" />
-              Авто-расшифровка после звонка
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={autoFillLead} onChange={(e) => setAutoFillLead(e.target.checked)} className="accent-teal-600" />
-              Авто-заполнение карточки (без подтверждения)
-            </label>
+          <h4 className="font-medium text-sm">Записи звонков</h4>
+          <p className={`text-xs ${t.muted} mt-1`}>
+            Расшифровка и AI для звонков — в <strong>Настройки CRM → AI → модуль «Звонки»</strong>.
+          </p>
+          <div className="mt-3">
+            <label className={`text-xs ${t.muted}`}>Заголовок для скачивания записи с АТС</label>
+            <input value={recordingAuthHeader} onChange={(e) => setRecordingAuthHeader(e.target.value)} placeholder="Authorization: Bearer …"
+              className={`w-full mt-1 rounded-lg border px-3 py-2 text-sm ${t.input}`} />
           </div>
         </div>
 
@@ -440,8 +411,11 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
           </Btn>
         </div>
       </div>
+      )}
 
-      {/* PUBLIC API */}
+      {show(["all", "connectors"]) && <UniversalConnectorsPanel t={t as never} />}
+
+      {show(["all", "public_api"]) && (
       <div className={`bio-card bio-glass-panel p-5 ${t.surface} ${t.border}`}>
         <h3 className="font-semibold flex items-center gap-2"><Code className="w-4 h-4 text-teal-600" /> Публичное API</h3>
         <p className={`text-sm ${t.muted} mt-1`}>Для кастомных форм и внешних сервисов (без Tilda)</p>
@@ -458,6 +432,7 @@ export function AdminIntegrations({ t, Btn, onSaved }: { t: Record<string, strin
   -d '{"name":"Иван","phone":"+79001234567","pdConsent":true}'`}</pre>
         <p className={`text-xs ${t.muted} mt-2`}>Поля: name, phone, region, preferredTime, comment, pdConsent (обязательно true)</p>
       </div>
+      )}
     </div>
   );
 }

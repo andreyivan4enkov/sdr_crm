@@ -25,7 +25,7 @@ async function upsertLeadByPhone(
       region: data.region,
       custom: data.custom,
       assignedUserId: data.assignedUserId,
-      assignedRealtorId: data.assignedRealtorId ?? null,
+      assignedDealManagerId: data.assignedDealManagerId ?? null,
       updatedAt: new Date(),
     }).where(eq(schema.leads.id, row.id));
     return row.id;
@@ -63,7 +63,7 @@ export async function ensureSequencerDemoEntities() {
   const [pipeline] = await db.select().from(schema.pipelines).where(eq(schema.pipelines.isDefault, true)).limit(1);
   if (!pipeline) return;
 
-  const stageByLabel = (label: string) => stages.find((s) => s.label === label);
+  const stageByLabel = (label: string) => stages.find((s: typeof schema.stages.$inferSelect) => s.label === label);
   const stageNew = stageByLabel("Новый лид") ?? stages[0]!;
   const stageDeal = stageByLabel("Сделка") ?? stageByLabel("В работе") ?? stages[stages.length - 2]!;
   const stageQualified = stageByLabel("Квалифицирован") ?? stages[2] ?? stages[0]!;
@@ -74,7 +74,7 @@ export async function ensureSequencerDemoEntities() {
   const { user: adminUser, displayName: adminName } = admin;
   const assign = {
     assignedUserId: adminUser.id,
-    assignedRealtorId: null as string | null,
+    assignedDealManagerId: null as string | null,
   };
   const taskAssign = {
     assignee: adminName,

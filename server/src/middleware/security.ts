@@ -1,6 +1,6 @@
 import type { Context, Next } from "hono";
 import { getClientIp } from "../lib/clientIp.js";
-import { rateLimit } from "./rateLimit.js";
+import { rateLimitAsync } from "./rateLimit.js";
 
 const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 1_048_576);
 
@@ -9,19 +9,26 @@ export async function globalApiRateLimit(c: Context, next: Next) {
   if (process.env.NODE_ENV !== "production") return next();
   const ip = getClientIp(c);
   const max = Number(process.env.API_RATE_LIMIT_PER_MIN || 400);
-  if (!rateLimit(`api-global:${ip}`, max, 60_000)) {
+  if (!(await rateLimitAsync(`api-global:${ip}`, max, 60_000))) {
     return c.json({ error: "Слишком много запросов. Попробуйте позже." }, 429);
   }
   return next();
 }
 
-/** Ограничение размера тела запроса */
+/** Ограничение размера тела запроса (проверка Content-Length и фактического размера). */
 export async function bodySizeLimit(c: Context, next: Next) {
   const method = c.req.method;
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
   const cl = c.req.header("content-length");
   if (cl && Number(cl) > MAX_BODY_BYTES) {
     return c.json({ error: "Слишком большой запрос" }, 413);
+  }
+  const raw = c.req.raw;
+  if (raw.body) {
+    const buf = await raw.clone().arrayBuffer();
+    if (buf.byteLength > MAX_BODY_BYTES) {
+      return c.json({ error: "Слишком большой запрос" }, 413);
+    }
   }
   return next();
 }

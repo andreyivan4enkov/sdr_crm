@@ -188,7 +188,7 @@ export function LeadCallHistory({
             type="button"
             onClick={onDial}
             disabled={dialing}
-            className="glass-call-dial-btn"
+            className="bio-btn-primary glass-call-dial-btn"
           >
             {dialing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PhoneCall className="w-3.5 h-3.5" />}
             Позвонить

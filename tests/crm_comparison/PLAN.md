@@ -1,12 +1,12 @@
-# План сравнения: Classic CRM vs SDR CRM
+# План сравнения: Classic CRM vs Advanced bench
 
 ## Цель
 
-Сопоставить **SDR CRM на классической стеке** (PostgreSQL/PGlite, Drizzle, Hono REST, RBAC, SQL JOIN, stage automations) с **той же предметной областью на методах SDR** (SDM, VSA, VaCoAl, FPTM, Active Inference, CA) по измеримым метрикам и **отраслевым эталонам** CRM/SaaS/серверного ПО.
+Сопоставить **CRM на классической стеке** (PostgreSQL/PGlite, Drizzle, Hono REST, RBAC, SQL JOIN, stage automations) с **той же предметной областью на векторных методах** (SDM, VSA, VaCoAl, FPTM, Active Inference, CA) по измеримым метрикам и **отраслевым эталонам** CRM/SaaS/серверного ПО.
 
 ## Контекст репозитория
 
-| Слой | Classic (production) | SDR (benchmark) |
+| Слой | Classic (production) | Bench (benchmark) |
 |------|---------------------|-----------------|
 | API | `server/src/routes/*.ts` | — |
 | БД | `server/src/db/schema.ts`, Drizzle | SDM / VaCoAl in-memory |
@@ -16,7 +16,7 @@
 | Аудит | `audit_log` + RBAC | Surprisal layer |
 | Воронка | SQL `COUNT` по stages | CA Rule 184 |
 
-**Важно:** production CRM сегодня — classic. SDR реализован в `tests/strict_math_refactor/bench-core.ts`. Сравнение — **экспериментальное**, на синтетике и симуляторах classic-паттернов, с явной фиксацией production gap.
+**Важно:** production CRM сегодня — classic. Bench реализован в `tests/strict_math_refactor/bench-core.ts`. Сравнение — **экспериментальное**, на синтетике и симуляторах classic-паттернов, с явной фиксацией production gap.
 
 ---
 
@@ -39,7 +39,7 @@
 | IND-FUZZY | Noisy record match | ≥ 95 % | Data quality |
 | IND-COLLISION | Memory collision rate | ≤ 0.05 % | Associative memory |
 | IND-VSA-ACC | Attribute unbind | ≥ 98 % | Composite records |
-| IND-GRAPH-SPEEDUP | SDR vs SQL speedup | ≥ 1.2× | VaCoAl claim |
+| IND-GRAPH-SPEEDUP | Bench vs SQL speedup | ≥ 1.2× | VaCoAl claim |
 | IND-CA-STABILITY | Funnel attractor | ≥ 0.35 LST | Pipeline model |
 
 ---
@@ -48,7 +48,7 @@
 
 ### Фаза 1 — Память (MEM)
 
-| ID | Classic реализация | SDR реализация | Bench ref |
+| ID | Classic реализация | Bench реализация | Bench ref |
 |----|-------------------|----------------|-----------|
 | CMP-MEM-01 | `Map` exact key + linear scan | SDM store/recall, collision % | MEM-1.1 |
 | CMP-MEM-02 | Exact match after 28% bit corruption | Hamming radius recall | MEM-1.2 |
@@ -57,7 +57,7 @@
 
 ### Фаза 2 — Tsetlin (TM)
 
-| ID | Classic | SDR | Bench ref |
+| ID | Classic | Bench | Bench ref |
 |----|---------|-----|-----------|
 | CMP-TM-01 | Heuristic rule engine (stage automations) | FPTM `predict` accuracy | TM-2.1 |
 | CMP-TM-02 | JS filter loop on lead features | `bitInfer` throughput | TM-2.2 |
@@ -66,7 +66,7 @@
 
 ### Фаза 3 — AI / Security
 
-| ID | Classic | SDR | Bench ref |
+| ID | Classic | Bench | Bench ref |
 |----|---------|-----|-----------|
 | CMP-AI-01 | RBAC passes `lead.export` | Surprisal > threshold | AI-3.1 |
 | CMP-AI-02 | `randomBytes` only | Hardware entropy cascade | AI-3.2 |
@@ -75,7 +75,7 @@
 
 ### Фаза 4 — Сервер / CRM standards
 
-| ID | Что измеряем | Classic | SDR | Industry |
+| ID | Что измеряем | Classic | Bench | Industry |
 |----|--------------|---------|-----|----------|
 | CMP-SRV-01 | List 5000 leads + notes join sim | ms | SDM batch recall ms | IND-API-LIST |
 | CMP-SRV-02 | RSS / bytes per 10k records | row estimate | SDM RSS | IND-MEM-10K |
@@ -88,7 +88,7 @@
 ## Порядок выполнения (пошагово)
 
 1. **Запуск** `npx tsx tests/crm_comparison/compare-bench.ts`
-2. Скрипт последовательно выполняет CMP-* тесты (classic и SDR на одной машине)
+2. Скрипт последовательно выполняет CMP-* тесты (classic и Bench на одной машине)
 3. Каждый тест пишет в `logs/comparison.log`: метрики, эталон, вердикт
 4. Финал: сводная таблица + production gap + рекомендации
 5. Обновить `CHECKLIST.md` — все пункты `[x]` после успешного прогона
@@ -99,10 +99,10 @@
 
 | Вердикт | Условие |
 |---------|---------|
-| **SDR_WIN** | SDR метрика лучше classic И проходит industry |
-| **CLASSIC_WIN** | Classic лучше или SDR не проходит industry |
+| **BENCH_WIN** | Bench метрика лучше classic И проходит industry |
+| **CLASSIC_WIN** | Classic лучше или Bench не проходит industry |
 | **PARITY** | Разница < 10%, оба проходят industry |
-| **SDR_WIN_GAP** | SDR лучше в bench, но **не в production** |
+| **BENCH_WIN_GAP** | Bench лучше в bench, но **не в production** |
 | **FAIL** | Оба не проходят industry |
 
 ---
@@ -129,7 +129,7 @@
 | `CHECKLIST.md` | Чеклист фаз |
 | `logs/comparison.log` | Отчёт compare |
 | `logs/stress-report.log` | Отчёт stress + scorecard |
-| `../strict_math_refactor/bench-core.ts` | Эталон SDR math |
+| `../strict_math_refactor/bench-core.ts` | Эталон bench math |
 | `../../тесты/CRM-система_ Аудит, методы, ТЗ.md` | ТЗ на методы |
 
 ## Стресс-протокол (`npm run bench:stress`)

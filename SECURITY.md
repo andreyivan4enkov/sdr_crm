@@ -1,4 +1,4 @@
-# Безопасность SDR CRM
+# Безопасность CRM
 
 ## Поддерживаемые версии
 
@@ -18,7 +18,7 @@
 - JWT в httpOnly cookie (не localStorage)
 - bcrypt для паролей, минимум 8 символов + буквы и цифры
 - Регистрация только по invite-ссылке от администратора
-- RBAC: роли `admin`, `integrator`, `operator`, `realtor` с гранулярными правами
+- RBAC: роли `admin`, `integrator`, `operator`, `deal_manager` (менеджер по сделкам) с гранулярными правами
 - Rate limit на login, регистрацию, публичные заявки и webhooks
 
 ### Персональные данные (152-ФЗ)

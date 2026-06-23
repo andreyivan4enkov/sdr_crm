@@ -24,7 +24,6 @@ export async function signToken(user: AuthUser) {
     sub: user.id,
     login: user.login,
     role: user.roleName,
-    permissions: user.permissions,
     status: user.status,
   })
     .setProtectedHeader({ alg: "HS256" })
@@ -35,7 +34,7 @@ export async function signToken(user: AuthUser) {
 
 export async function verifyToken(token: string) {
   const { payload } = await jwtVerify(token, secret());
-  return payload as { sub: string; login: string; role: string | null; permissions: string[]; status: string };
+  return payload as { sub: string; login: string; role: string | null; status: string };
 }
 
 export function getCookieName() {

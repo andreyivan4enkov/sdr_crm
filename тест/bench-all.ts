@@ -40,6 +40,7 @@ const CONFIG = {
   "AI-3.2": { sampleBytes: 4096, minEntropyBits: 6.5, iterations: 100 },
   "AI-3.3": { routineCount: 5000, destructiveCount: 500, minEnergyRatio: 1.5 },
   "AI-3.4": { stageCount: 8, transitionCount: 20000, minStabilityScore: 0.35 },
+  "AI-4.1": { iterations: 50, maxLatencyMs: 50 },
 } as const;
 
 const FEATURES = [
@@ -147,7 +148,7 @@ function estimateMinEntropy(bytes: Uint8Array) {
   return e;
 }
 
-// ─── SDR / SDM ────────────────────────────────────────────────────────────────
+// ─── Vector / SDM ─────────────────────────────────────────────────────────────
 type SdrCfg = { dimensions: number; activeBits: number };
 function mulberry32(seed: number) {
   return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -279,11 +280,11 @@ class VaCoAlIndex {
     return results;
   }
 }
-type SqlRow = { leadId: string; stage: string; pipeline: string; channel: string; realtor: string; orgUnit: string };
+type SqlRow = { leadId: string; stage: string; pipeline: string; channel: string; dealManager: string; orgUnit: string };
 function buildGraph(n: number): SqlRow[] {
   return Array.from({ length: n }, (_, i) => ({
     leadId: `lead-${i}`, stage: `stage-${i % 20}`, pipeline: `pipe-${i % 5}`,
-    channel: `ch-${i % 8}`, realtor: `realtor-${i % 50}`, orgUnit: `org-${i % 10}`,
+    channel: `ch-${i % 8}`, dealManager: `dealManager-${i % 50}`, orgUnit: `org-${i % 10}`,
   }));
 }
 function sqlFiveHop(rows: SqlRow[], leadId: string) {
@@ -293,7 +294,7 @@ function sqlFiveHop(rows: SqlRow[], leadId: string) {
   const s1 = hop("stage", lead.stage);
   const s2 = s1 ? hop("pipeline", s1.pipeline) : undefined;
   const s3 = s2 ? hop("channel", s2.channel) : undefined;
-  const s4 = s3 ? hop("realtor", s3.realtor) : undefined;
+  const s4 = s3 ? hop("deal_manager", s3.dealManager) : undefined;
   return s4 ? hop("orgUnit", s4.orgUnit) : undefined;
 }
 function benchSql(rows: SqlRow[], queries: string[]) {
@@ -806,6 +807,30 @@ const BENCHMARKS: Record<string, { title: string; run: BenchFn }> = {
         disqualificationCriteria: [{ label: "Хаос", passed: pass, detail: pass ? "нет" : "да" }],
         samples: counts.map((c, i) => `stage-${i}: ${c}`),
         recommendation: pass ? "CA-модель устойчива." : "Скорректировать правила.",
+      };
+    },
+  },
+  "AI-4.1": {
+    title: "AIboard aggregation latency",
+    async run() {
+      const cfg = CONFIG["AI-4.1"];
+      const { runAggregation, buildStressSources } = await import("../packages/aiboard-core/src/index.ts");
+      const times: number[] = [];
+      for (let i = 0; i < cfg.iterations; i++) {
+        const t0 = performance.now();
+        runAggregation({ sources: buildStressSources(), grainNormalized: true, reconcileStrategy: "приоритет" });
+        times.push(performance.now() - t0);
+      }
+      times.sort((a, b) => a - b);
+      const p99 = times[Math.floor(times.length * 0.99)] ?? times[times.length - 1]!;
+      const pass = p99 <= cfg.maxLatencyMs;
+      return {
+        code: "AI-4.1", title: "AIboard aggregation", status: pass ? "PASS" : "FAIL", durationMs: p99,
+        methodology: "runAggregation stress sources; p99 latency over iterations.",
+        metrics: [{ name: "p99_ms", value: p99.toFixed(2), unit: "ms", threshold: `≤ ${cfg.maxLatencyMs}`, ok: pass }],
+        successCriteria: [{ label: "Latency", passed: pass, detail: `p99=${p99.toFixed(2)}ms` }],
+        disqualificationCriteria: [{ label: "Slow aggregation", passed: pass, detail: pass ? "нет" : "да" }],
+        recommendation: pass ? "Aggregation engine готов к production." : "Профилировать runAggregation.",
       };
     },
   },

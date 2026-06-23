@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../db/index.js";
 import { roles } from "../../db/schema.js";
-import { ALL_PERMISSIONS } from "../../lib/permissions.js";
+import { ALL_PERMISSIONS, sanitizeRolePermissions } from "../../lib/permissions.js";
 import { requireAuth, requirePermission, type AppEnv } from "../../middleware/auth.js";
 import { writeAudit } from "../../lib/audit.js";
 import { getClientIp } from "../../lib/clientIp.js";
@@ -25,7 +25,8 @@ adminRoleRoutes.post("/", async (c) => {
   }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
-  const [role] = await db.insert(roles).values(body.data).returning();
+  const permissions = sanitizeRolePermissions(body.data.permissions);
+  const [role] = await db.insert(roles).values({ ...body.data, permissions }).returning();
   const user = c.get("user");
   await writeAudit({
     userId: user.id, userLogin: user.login, action: "role.create",
@@ -42,7 +43,12 @@ adminRoleRoutes.patch("/:id", async (c) => {
   }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
-  const [role] = await db.update(roles).set(body.data).where(eq(roles.id, c.req.param("id"))).returning();
+  const patch = {
+    ...body.data,
+    ...(body.data.permissions ? { permissions: sanitizeRolePermissions(body.data.permissions) } : {}),
+    updatedAt: new Date(),
+  };
+  const [role] = await db.update(roles).set(patch).where(eq(roles.id, c.req.param("id"))).returning();
   if (!role) return c.json({ error: "Not found" }, 404);
   const user = c.get("user");
   await writeAudit({

@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Search, Settings2, X } from "lucide-react";
 import type { CrmData } from "../hooks/useCrmData";
 import { useLeadsListPrefs } from "../hooks/useLeadsListPrefs";
+import { AnchoredPopover } from "./AnchoredPopover";
 import {
   formatLeadCell,
   leadCellText,
   sortLeadsByColumn,
   type LeadColumnId,
 } from "../lib/leads-list-columns";
-import { stageHex, statusContourStyle } from "../lib/stage-colors";
+import { stageHex, entityCardAccentVars } from "../lib/stage-colors";
+import { useTheme } from "../context/ThemeProvider";
 import { leadResponsibleMember } from "../lib/team-members";
 import { stagesForPipeline, leadsForPipeline } from "../lib/crm-pipelines";
 
@@ -20,10 +22,11 @@ type Props = {
 };
 
 export function LeadsListView({ t, data, pipelineId, onOpen }: Props) {
+  const { theme } = useTheme();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [colsOpen, setColsOpen] = useState(false);
-  const colsRef = useRef<HTMLDivElement>(null);
+  const [colsAnchor, setColsAnchor] = useState<HTMLElement | null>(null);
 
   const {
     allColumns,
@@ -36,15 +39,6 @@ export function LeadsListView({ t, data, pipelineId, onOpen }: Props) {
     toggleSort,
   } = useLeadsListPrefs(data.fields);
 
-  useEffect(() => {
-    if (!colsOpen) return;
-    function onDoc(e: MouseEvent) {
-      if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [colsOpen]);
-
   const pipelineStages = useMemo(() => stagesForPipeline(data.stages, pipelineId ?? null), [data.stages, pipelineId]);
   const stageIds = useMemo(() => new Set(pipelineStages.map((s) => s.id)), [pipelineStages]);
   const pipelineLeads = useMemo(
@@ -56,9 +50,9 @@ export function LeadsListView({ t, data, pipelineId, onOpen }: Props) {
     stages: pipelineStages,
     channels: data.channels,
     employees: data.employees || [],
-    realtors: data.realtors,
+    dealManagers: data.dealManagers,
     fields: data.fields,
-  }), [pipelineStages, data.channels, data.employees, data.realtors, data.fields]);
+  }), [pipelineStages, data.channels, data.employees, data.dealManagers, data.fields]);
 
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -103,7 +97,7 @@ export function LeadsListView({ t, data, pipelineId, onOpen }: Props) {
               <option value="all">Все этапы</option>
               {pipelineStages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
-            <div className="relative" ref={colsRef}>
+            <div ref={setColsAnchor}>
             <button
               type="button"
               onClick={() => setColsOpen((v) => !v)}
@@ -114,8 +108,13 @@ export function LeadsListView({ t, data, pipelineId, onOpen }: Props) {
               <span className="hidden sm:inline">Поля</span>
               <ChevronDown className={`w-3.5 h-3.5 transition ${colsOpen ? "rotate-180" : ""}`} />
             </button>
-            {colsOpen && (
-              <div className={`absolute right-0 top-full mt-1.5 z-30 w-64 rounded-2xl border shadow-xl p-3 ${t.surface} ${t.border}`}>
+            <AnchoredPopover
+              anchor={colsAnchor}
+              open={colsOpen}
+              onClose={() => setColsOpen(false)}
+              align="right"
+              className={`w-64 rounded-2xl border shadow-xl p-3 ${t.surface} ${t.border}`}
+            >
                 <div className="flex items-center justify-between mb-2">
                   <span className={`text-xs font-semibold uppercase tracking-wide ${t.muted}`}>Колонки списка</span>
                   <button type="button" onClick={() => setColsOpen(false)} className={t.muted}><X className="w-3.5 h-3.5" /></button>
@@ -148,8 +147,7 @@ export function LeadsListView({ t, data, pipelineId, onOpen }: Props) {
                 >
                   Сбросить по умолчанию
                 </button>
-              </div>
-            )}
+            </AnchoredPopover>
             </div>
           </div>
         </div>
@@ -187,14 +185,21 @@ export function LeadsListView({ t, data, pipelineId, onOpen }: Props) {
               <div className="space-y-2">
                 {rows.map((lead) => {
                   const stage = stageOf(lead.status);
-                  const responsible = leadResponsibleMember(lead, data.employees || [], data.realtors);
+                  const responsible = leadResponsibleMember(lead, data.employees || [], data.dealManagers);
                   return (
                     <button
                       key={lead.id}
                       type="button"
-                      onClick={() => onOpen(lead.id)}
-                      className={`w-full grid gap-x-3 items-center rounded-2xl border text-left px-4 py-3 transition-all duration-200 ${t.surface} hover:shadow-md active:scale-[0.998]`}
-                      style={{ gridTemplateColumns: gridCols, ...(stage ? statusContourStyle(stage.color) : {}) }}
+                      onClick={(e) => {
+                        if (e.ctrlKey || e.metaKey) {
+                          e.preventDefault();
+                          window.dispatchEvent(new CustomEvent("crm:peek-lead", { detail: { id: lead.id } }));
+                        } else {
+                          onOpen(lead.id);
+                        }
+                      }}
+                      className="bio-entity-card w-full grid gap-x-3 items-center text-left px-4 py-3"
+                      style={{ gridTemplateColumns: gridCols, ...(stage ? entityCardAccentVars(stage.color, false, theme.colorMode) : {}) }}
                     >
                       {visibleColumns.map((col) => (
                         <div key={col.id} className="min-w-0 max-w-[16rem] crm-data">

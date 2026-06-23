@@ -7,6 +7,7 @@ import { integrations, stages, channels, leads } from "../../db/schema.js";
 import { broadcastToAll } from "../../lib/events.js";
 import { dispatchNotification } from "../../lib/notify.js";
 import { writeAudit } from "../../lib/audit.js";
+import { verifyWebhookAuth } from "../../lib/webhook-secret.js";
 import { isMarketingType, MARKETING_CHANNEL_BY_TYPE, MARKETING_LABELS } from "../../lib/marketing-meta.js";
 import { parseMarketingLead, readMarketingBody } from "../../lib/marketing-parse.js";
 
@@ -21,16 +22,17 @@ marketingWebhook.post("/:source", async (c) => {
     return c.json({ error: "Too many requests" }, 429);
   }
 
-  const secret = c.req.header("X-Webhook-Secret") || c.req.query("secret");
+  const secret = c.req.header("X-Webhook-Secret");
   const [integration] = await db.select().from(integrations).where(eq(integrations.type, source)).limit(1);
   if (!integration?.enabled) return c.json({ error: "Integration disabled" }, 403);
 
   const config = (integration.config || {}) as { webhookSecret?: string };
-  if (!secret || secret !== config.webhookSecret) {
-    return c.json({ error: "Invalid webhook secret" }, 401);
+  const raw = await c.req.text();
+  const check = verifyWebhookAuth(secret, raw, c.req.header("X-Webhook-Signature"), config.webhookSecret);
+  if (!check.ok) {
+    return c.json({ error: check.error }, check.status);
   }
 
-  const raw = await c.req.text();
   const contentType = c.req.header("content-type") || "";
   const body = readMarketingBody(raw, contentType);
 

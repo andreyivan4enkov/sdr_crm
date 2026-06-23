@@ -1,7 +1,7 @@
 import { TOTP, Secret } from "otpauth";
 import { createHash, randomBytes } from "node:crypto";
 
-const ISSUER = "SDR CRM";
+const ISSUER = "CRM";
 
 export function generateTotpSecret(login: string) {
   const secret = new Secret({ size: 20 });

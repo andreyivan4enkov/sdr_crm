@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { leads, leadNotes, tasks } from "../db/schema.js";
 import { dispatchNotification } from "./notify.js";
-import { resolveAssigneeFromRealtor, resolveAssigneeFromUser } from "./lead-access.js";
+import { resolveAssigneeFromDealManager, resolveAssigneeFromUser } from "./lead-access.js";
 import type { AutomationResult } from "./automations.js";
 
 type LeadRow = typeof leads.$inferSelect;
@@ -40,8 +40,8 @@ export async function persistAutomationSideEffects(
 
   if (result.assignUserId !== undefined) {
     Object.assign(leadPatch, await resolveAssigneeFromUser(result.assignUserId));
-  } else if (result.assignRealtorId !== undefined) {
-    Object.assign(leadPatch, await resolveAssigneeFromRealtor(result.assignRealtorId));
+  } else if (result.assignDealManagerId !== undefined) {
+    Object.assign(leadPatch, await resolveAssigneeFromDealManager(result.assignDealManagerId));
   }
 
   if (result.fieldPatches) {
@@ -74,7 +74,7 @@ export async function persistAutomationSideEffects(
         channelId: src.channelId,
         pipelineId: result.copyTo.pipelineId,
         statusId: result.copyTo.stageId,
-        assignedRealtorId: src.assignedRealtorId,
+        assignedDealManagerId: src.assignedDealManagerId,
         assignedUserId: src.assignedUserId,
         watchers: src.watchers,
         custom: src.custom,

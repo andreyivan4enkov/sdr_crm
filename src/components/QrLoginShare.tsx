@@ -30,7 +30,7 @@ export function QrLoginShare({ open, onClose, t, userName }: Props) {
     setLoading(true);
     setErr("");
     try {
-      const cfg = await api.getAuthConfig();
+      const cfg = await api.getAuthRuntime();
       const base = qrBaseUrl(cfg.publicUrl);
       const res = await api.createQrLogin(base);
       setUrl(res.url);

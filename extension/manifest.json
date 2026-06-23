@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "SDR CRM",
+  "name": "CRM",
   "description": "Быстрые действия CRM: создать лид, открыть карточку с сайта объявления",
   "version": "0.1.0",
   "action": {
-    "default_title": "SDR CRM",
+    "default_title": "CRM",
     "default_popup": "popup/popup.html"
   },
   "background": {

@@ -1,4 +1,4 @@
-# Деплой SDR CRM на Reg.ru VPS
+# Деплой CRM на Reg.ru VPS
 
 ## Что нужно заказать на Reg.ru
 
@@ -59,7 +59,7 @@ cd /var/www/sdr-crm
 git clone https://gitverse.ru/Corpuscul/sdr_crm.git .
 
 # Вариант B: загрузить с компьютера
-# scp -r ./SDR CRM-CRM/* root@ВАШ_IP:/var/www/sdr-crm/
+# scp -r ./CRM-CRM/* root@ВАШ_IP:/var/www/sdr-crm/
 ```
 
 ---

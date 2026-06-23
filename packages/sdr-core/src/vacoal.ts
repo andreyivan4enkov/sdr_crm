@@ -1,4 +1,4 @@
-/** VaCoAl graph index for multi-hop SDR search. */
+/** VaCoAl graph index for multi-hop vector search. */
 export class VaCoAlGraph {
   private nodes = new Map<string, { id: string; sdr: Uint8Array; edges: string[] }>();
 
@@ -39,6 +39,23 @@ export class VaCoAlGraph {
       frontier = next;
     }
     return results;
+  }
+
+  nodeIds(): string[] {
+    return [...this.nodes.keys()];
+  }
+
+  neighbors(id: string): string[] {
+    return [...(this.nodes.get(id)?.edges ?? [])];
+  }
+
+  sdrSimilarity(aId: string, bId: string): number {
+    const a = this.nodes.get(aId)?.sdr;
+    const b = this.nodes.get(bId)?.sdr;
+    if (!a || !b || a.length !== b.length) return 0;
+    let same = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] === b[i]) same++;
+    return same / a.length;
   }
 }
 
