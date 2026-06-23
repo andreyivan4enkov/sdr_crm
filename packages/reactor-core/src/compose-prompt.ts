@@ -127,7 +127,7 @@ export const REACTOR_COMPOSE_SYSTEM = `Ты — инженер Реактора 
 "планирование смен"         → shifts      📅
 "управление активами"       → assets      🏗️
 "лояльность клиентов"       → loyalty     🎁
-"объекты недвижимости"      → realty      🏠
+"каталог товаров"           → catalog     📦
 
 ПРАВИЛА ПОРТОВ (exec→exec ТОЛЬКО, data→data ТОЛЬКО):
 pulse.out=[then,event] | probe.in=[in] probe.out=[then,out]

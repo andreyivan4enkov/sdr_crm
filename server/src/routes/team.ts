@@ -2,11 +2,12 @@ import { Hono } from "hono";
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.js";
-import { orgUnits, profiles, realtors, roles, users } from "../db/schema.js";
-import { ALL_PERMISSIONS } from "../lib/permissions.js";
+import { orgUnits, profiles, dealManagers, roles, users } from "../db/schema.js";
+import { ALL_PERMISSIONS, sanitizeRolePermissions } from "../lib/permissions.js";
 import { requireAuth, requireAnyPermission, requirePermission, type AppEnv } from "../middleware/auth.js";
 import { writeAudit } from "../lib/audit.js";
 import { getClientIp } from "../lib/clientIp.js";
+import { withLegacyDealManagerResponse, withLegacyTeamPayload } from "../lib/api-legacy-fields.js";
 
 export const teamRoutes = new Hono<AppEnv>();
 
@@ -27,25 +28,25 @@ async function loadTeamPayload() {
     .leftJoin(roles, eq(orgUnits.defaultRoleId, roles.id))
     .orderBy(asc(orgUnits.sortOrder));
 
-  const realtorRows = await db
+  const dealManagerRows = await db
     .select({
-      id: realtors.id,
-      name: realtors.name,
-      region: realtors.region,
-      phone: realtors.phone,
-      userId: realtors.userId,
-      orgUnitId: realtors.orgUnitId,
-      position: realtors.position,
-      roleId: realtors.roleId,
-      createdAt: realtors.createdAt,
+      id: dealManagers.id,
+      name: dealManagers.name,
+      region: dealManagers.region,
+      phone: dealManagers.phone,
+      userId: dealManagers.userId,
+      orgUnitId: dealManagers.orgUnitId,
+      position: dealManagers.position,
+      roleId: dealManagers.roleId,
+      createdAt: dealManagers.createdAt,
       roleName: roles.label,
       orgUnitName: orgUnits.name,
       userLogin: users.login,
     })
-    .from(realtors)
-    .innerJoin(users, eq(realtors.userId, users.id))
-    .leftJoin(roles, eq(realtors.roleId, roles.id))
-    .leftJoin(orgUnits, eq(realtors.orgUnitId, orgUnits.id))
+    .from(dealManagers)
+    .innerJoin(users, eq(dealManagers.userId, users.id))
+    .leftJoin(roles, eq(dealManagers.roleId, roles.id))
+    .leftJoin(orgUnits, eq(dealManagers.orgUnitId, orgUnits.id))
     .where(eq(users.status, "active"));
 
   const roleRows = await db.select().from(roles);
@@ -82,7 +83,7 @@ async function loadTeamPayload() {
 
   return {
     orgUnits: unitRows,
-    realtors: realtorRows,
+    dealManagers: dealManagerRows,
     roles: roleRows,
     linkableUsers: userRows,
     employees: employeeRows.map((e: typeof employeeRows[number]) => ({
@@ -103,19 +104,19 @@ async function syncUserRole(userId: string | null | undefined, roleId: string | 
   await db.update(users).set({ roleId, updatedAt: new Date() }).where(eq(users.id, userId));
 }
 
-async function ensureUserLinkUnique(userId: string | null | undefined, realtorId?: string) {
+async function ensureUserLinkUnique(userId: string | null | undefined, dealManagerId?: string) {
   if (!userId) return null;
-  const [existing] = await db.select().from(realtors).where(
-    realtorId
-      ? and(eq(realtors.userId, userId), ne(realtors.id, realtorId))
-      : eq(realtors.userId, userId),
+  const [existing] = await db.select().from(dealManagers).where(
+    dealManagerId
+      ? and(eq(dealManagers.userId, userId), ne(dealManagers.id, dealManagerId))
+      : eq(dealManagers.userId, userId),
   ).limit(1);
   if (existing) return "Эта учётная запись уже привязана к другому сотруднику";
   return null;
 }
 
 teamRoutes.get("/", async (c) => {
-  return c.json(await loadTeamPayload());
+  return c.json(withLegacyTeamPayload(await loadTeamPayload()));
 });
 
 const unitSchema = z.object({
@@ -175,7 +176,7 @@ teamRoutes.delete("/units/:id", requirePermission("team.manage"), async (c) => {
   if (!unit) return c.json({ error: "Not found" }, 404);
 
   await db.update(orgUnits).set({ parentId: unit.parentId }).where(eq(orgUnits.parentId, id));
-  await db.update(realtors).set({ orgUnitId: null }).where(eq(realtors.orgUnitId, id));
+  await db.update(dealManagers).set({ orgUnitId: null }).where(eq(dealManagers.orgUnitId, id));
   await db.delete(orgUnits).where(eq(orgUnits.id, id));
 
   const user = c.get("user");
@@ -189,7 +190,7 @@ teamRoutes.delete("/units/:id", requirePermission("team.manage"), async (c) => {
   return c.json({ ok: true });
 });
 
-const realtorSchema = z.object({
+const dealManagerSchema = z.object({
   name: z.string().min(1),
   region: z.string().min(1),
   phone: z.string().optional(),
@@ -200,7 +201,7 @@ const realtorSchema = z.object({
 });
 
 teamRoutes.post("/", requireAnyPermission(["team.manage", "leads.write"]), async (c) => {
-  const body = realtorSchema.safeParse(await c.req.json());
+  const body = dealManagerSchema.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
   const linkErr = await ensureUserLinkUnique(body.data.userId);
@@ -212,55 +213,55 @@ teamRoutes.post("/", requireAnyPermission(["team.manage", "leads.write"]), async
     roleId = unit?.defaultRoleId ?? null;
   }
 
-  const [realtor] = await db.insert(realtors).values({
+  const [dealManager] = await db.insert(dealManagers).values({
     ...body.data,
     roleId,
   }).returning();
 
-  await syncUserRole(realtor.userId, realtor.roleId);
+  await syncUserRole(dealManager.userId, dealManager.roleId);
 
   const user = c.get("user");
   await writeAudit({
     userId: user.id, userLogin: user.login, action: "employee.create",
-    entityType: "realtor", entityId: realtor.id,
+    entityType: "deal_manager", entityId: dealManager.id,
     ip: getClientIp(c), userAgent: c.req.header("user-agent"),
-    meta: { name: realtor.name },
+    meta: { name: dealManager.name },
   });
 
-  return c.json({ realtor }, 201);
+  return c.json(withLegacyDealManagerResponse(dealManager), 201);
 });
 
 teamRoutes.patch("/:id", requireAnyPermission(["team.manage", "leads.write"]), async (c) => {
-  const body = realtorSchema.partial().safeParse(await c.req.json());
+  const body = dealManagerSchema.partial().safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
   const id = c.req.param("id");
   const linkErr = await ensureUserLinkUnique(body.data.userId, id);
   if (linkErr) return c.json({ error: linkErr }, 409);
 
-  const [realtor] = await db.update(realtors).set(body.data).where(eq(realtors.id, id)).returning();
-  if (!realtor) return c.json({ error: "Not found" }, 404);
+  const [dealManager] = await db.update(dealManagers).set(body.data).where(eq(dealManagers.id, id)).returning();
+  if (!dealManager) return c.json({ error: "Not found" }, 404);
 
-  await syncUserRole(realtor.userId, realtor.roleId);
+  await syncUserRole(dealManager.userId, dealManager.roleId);
 
   const user = c.get("user");
   await writeAudit({
     userId: user.id, userLogin: user.login, action: "employee.update",
-    entityType: "realtor", entityId: realtor.id,
+    entityType: "deal_manager", entityId: dealManager.id,
     ip: getClientIp(c), userAgent: c.req.header("user-agent"),
   });
 
-  return c.json({ realtor });
+  return c.json(withLegacyDealManagerResponse(dealManager));
 });
 
 teamRoutes.delete("/:id", requireAnyPermission(["team.manage", "leads.write"]), async (c) => {
   const id = c.req.param("id");
-  await db.delete(realtors).where(eq(realtors.id, id));
+  await db.delete(dealManagers).where(eq(dealManagers.id, id));
 
   const user = c.get("user");
   await writeAudit({
     userId: user.id, userLogin: user.login, action: "employee.delete",
-    entityType: "realtor", entityId: id,
+    entityType: "deal_manager", entityId: id,
     ip: getClientIp(c), userAgent: c.req.header("user-agent"),
   });
 
@@ -277,7 +278,8 @@ teamRoutes.post("/roles", requirePermission("roles.manage"), async (c) => {
   const body = roleSchema.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
-  const [role] = await db.insert(roles).values(body.data).returning();
+  const permissions = sanitizeRolePermissions(body.data.permissions);
+  const [role] = await db.insert(roles).values({ ...body.data, permissions }).returning();
   const user = c.get("user");
   await writeAudit({
     userId: user.id, userLogin: user.login, action: "role.create",
@@ -294,10 +296,15 @@ teamRoutes.patch("/roles/:id", requirePermission("roles.manage"), async (c) => {
   }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
-  const [role] = await db.update(roles).set(body.data).where(eq(roles.id, c.req.param("id"))).returning();
+  const patch = {
+    ...body.data,
+    ...(body.data.permissions ? { permissions: sanitizeRolePermissions(body.data.permissions) } : {}),
+    updatedAt: new Date(),
+  };
+  const [role] = await db.update(roles).set(patch).where(eq(roles.id, c.req.param("id"))).returning();
   if (!role) return c.json({ error: "Not found" }, 404);
 
-  const assigned = await db.select({ userId: realtors.userId }).from(realtors).where(eq(realtors.roleId, role.id));
+  const assigned = await db.select({ userId: dealManagers.userId }).from(dealManagers).where(eq(dealManagers.roleId, role.id));
   const userIds = assigned.map((row: { userId: string | null }) => row.userId).filter(Boolean) as string[];
   if (userIds.length) {
     await db.update(users).set({ roleId: role.id, updatedAt: new Date() }).where(inArray(users.id, userIds));
@@ -321,7 +328,7 @@ teamRoutes.delete("/roles/:id", requirePermission("roles.manage"), async (c) => 
   }
 
   await db.update(orgUnits).set({ defaultRoleId: null }).where(eq(orgUnits.defaultRoleId, id));
-  await db.update(realtors).set({ roleId: null }).where(eq(realtors.roleId, id));
+  await db.update(dealManagers).set({ roleId: null }).where(eq(dealManagers.roleId, id));
   await db.delete(roles).where(eq(roles.id, id));
 
   const user = c.get("user");

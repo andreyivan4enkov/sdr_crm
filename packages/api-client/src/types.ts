@@ -464,7 +464,7 @@ export type TeamUser = {
   roleName: string | null;
 };
 
-export type Realtor = {
+export type DealManager = {
   id: string;
   name: string;
   region: string;
@@ -479,9 +479,14 @@ export type Realtor = {
   createdAt?: string;
 };
 
+/** @deprecated use DealManager */
+export type Realtor = DealManager;
+
 export type TeamPayload = {
   orgUnits: OrgUnit[];
-  realtors: Realtor[];
+  dealManagers: DealManager[];
+  /** @deprecated use dealManagers */
+  realtors?: DealManager[];
   roles: Role[];
   linkableUsers: TeamUser[];
   employees: TeamMember[];
@@ -491,7 +496,9 @@ export type Note = { id: string; text: string; author: string; createdAt: string
 export type Lead = {
   id: string; name: string; phone?: string; email?: string; region?: string;
   preferredTime?: string; comment?: string; source: string;
-  channelId?: string | null; pipelineId?: string; statusId?: string; assignedRealtorId?: string | null;
+  channelId?: string | null; pipelineId?: string; statusId?: string; assignedDealManagerId?: string | null;
+  /** @deprecated use assignedDealManagerId */
+  assignedRealtorId?: string | null;
   assignedUserId?: string | null;
   watchers?: string[];
   custom?: Record<string, string>; notes?: Note[]; createdBy?: string;
@@ -600,7 +607,9 @@ export type MyProfilePayload = {
     roleLabel: string | null;
     status: string;
     orgUnitName: string | null;
-    isRealtor: boolean;
+    isDealManager: boolean;
+    /** @deprecated use isDealManager */
+    isRealtor?: boolean;
   };
 };
 export type Integration = {

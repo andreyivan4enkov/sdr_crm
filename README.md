@@ -1,6 +1,8 @@
-# SDR CRM
+# CRM
 
-Персональная CRM для риэлторского агентства: лендинг, воронка лидов, канбан, задачи, RBAC, интеграции (Tilda, телефония).
+Универсальная CRM-платформа: лендинг, воронка лидов, канбан, задачи, RBAC, **Реактор v3** (flow/view/data/маска), интеграции (Tilda, телефония).
+
+**Версия:** 3.3.1 · релизный снимок: [`Для релиза/v3.3.1/`](Для%20релиза/v3.3.1/)
 
 ## Стек
 
@@ -18,7 +20,7 @@ cd sdr_crm
 cp deploy/.env.example server/.env
 npm install
 npm run db:migrate && npm run db:seed
-npm run dev:all
+npm run dev:all   # только из корня репо — упаковка в Для релиза/v3.3.1 + API + Vite
 ```
 
 - Frontend: http://localhost:5173  
@@ -35,8 +37,13 @@ npm run dev:all
 | Оператор | `operator` | `Operator1234` |
 | Интегратор | `integrator` | `Integrator1234` |
 | Маркетолог | `marketer` | `Marketer1234` |
+| Менеджер по сделкам | `elena.volkova` | `DealManager1234` (env `DEAL_MANAGER_PASSWORD`) |
 
 На экране входа есть кнопки быстрого входа (`ALLOW_DEMO_LOGIN=1` в `.env`).
+
+### API: переименование `realtor` → `deal_manager` (v3.3.1)
+
+Миграция БД: `server/drizzle/0035_rename_realtor_to_deal_manager.sql`. Новые поля: `dealManagers`, `assignedDealManagerId`, `isDealManager`. Старые имена (`realtors`, `assignedRealtorId`, `isRealtor`) принимаются и дублируются в ответах как deprecated. Подробнее: [`ai_docs/crm-team-api.md`](ai_docs/crm-team-api.md).
 
 Для production задайте `ALLOW_DEMO_LOGIN=0` и `SEED_DEMO_USERS=0`, смените пароли.
 

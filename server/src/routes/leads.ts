@@ -2,22 +2,23 @@ import { Hono, type Context } from "hono";
 import { eq, desc, sql, like, or, inArray, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.js";
-import { leads, leadNotes, stages, channels, realtors, tasks, auditLog, profiles, pipelines } from "../db/schema.js";
+import { leads, leadNotes, stages, channels, dealManagers, tasks, auditLog, profiles, pipelines } from "../db/schema.js";
 import { requireAuth, requirePermission, type AppEnv } from "../middleware/auth.js";
-import { runStageAutomations } from "../lib/automations.js";
-import { persistAutomationSideEffects } from "../lib/apply-stage-automations.js";
+import { listFieldsForEntity, validateRequiredFields, filterFieldsForContext } from "../lib/crm-fields/service.js";
+import { triggerBlueprintsForLeadChange } from "../lib/blueprint/trigger-dispatch.js";
 import { broadcastToAll } from "../lib/events.js";
 import { dispatchNotification } from "../lib/notify.js";
 import { writeAudit } from "../lib/audit.js";
 import { getClientIp } from "../lib/clientIp.js";
 import { buildLeadExport, eraseLeadPersonalData, revokeLeadConsent } from "../lib/lead-pd.js";
-import { canAccessLead, canEditLead, leadScopeWhere, resolveLeadScope, resolveAssigneeFromRealtor, resolveAssigneeFromUser, sanitizeLeadPatchForUser } from "../lib/lead-access.js";
+import { canAccessLead, canEditLead, leadScopeWhere, resolveLeadScope, resolveAssigneeFromDealManager, resolveAssigneeFromUser, sanitizeLeadPatchForUser } from "../lib/lead-access.js";
 import { formatLeadHistoryEntry, summarizeLeadPatch } from "../lib/lead-history.js";
 import { formatPhoneDisplay, isValidRuPhone } from "../lib/lead-phone.js";
 import { sdrConfig } from "../lib/sdr/config.js";
 import { leadSdrIndex, indexLeadAfterWrite } from "../lib/sdr/lead-index.js";
 import { leadFptmScoring } from "../lib/sdr/fptm-scoring.js";
 import { leadSdrGraph } from "../lib/sdr/lead-graph.js";
+import { remapLegacyLeadInput, withLegacyLeadFields } from "../lib/api-legacy-fields.js";
 
 const LEAD_HISTORY_HIDDEN = new Set(["lead.read", "lead.list"]);
 
@@ -121,7 +122,9 @@ leadRoutes.get("/", requirePermission("leads.read"), async (c) => {
   });
 
   return c.json({
-    leads: rows.map((l: typeof leads.$inferSelect) => ({ ...l, notes: notesByLead.get(l.id) || [] })),
+    leads: rows.map((l: typeof leads.$inferSelect) =>
+      withLegacyLeadFields({ ...l, notes: notesByLead.get(l.id) || [] }),
+    ),
     total,
     page,
     limit,
@@ -196,7 +199,7 @@ leadRoutes.get("/:id/history", requirePermission("leads.read"), async (c) => {
 
 leadRoutes.get("/:id/graph", requirePermission("leads.read"), async (c) => {
   if (!sdrConfig.graph || !leadSdrGraph.isReady()) {
-    return c.json({ error: "SDR graph disabled" }, 404);
+    return c.json({ error: "Lead graph disabled" }, 404);
   }
   const id = c.req.param("id");
   const access = await loadLeadForUser(c, id);
@@ -208,7 +211,7 @@ leadRoutes.get("/:id/graph", requirePermission("leads.read"), async (c) => {
 
 leadRoutes.get("/:id/score", requirePermission("leads.read"), async (c) => {
   if (!sdrConfig.scoring || !leadFptmScoring.isReady()) {
-    return c.json({ error: "SDR scoring disabled" }, 404);
+    return c.json({ error: "Lead scoring disabled" }, 404);
   }
   const id = c.req.param("id");
   const access = await loadLeadForUser(c, id);
@@ -230,7 +233,7 @@ leadRoutes.get("/:id", requirePermission("leads.read"), async (c) => {
     entityType: "lead", entityId: id,
     ip: getClientIp(c), userAgent: c.req.header("user-agent"),
   });
-  return c.json({ lead });
+  return c.json({ lead: withLegacyLeadFields(lead) });
 });
 
 const leadSchema = z.object({
@@ -243,7 +246,7 @@ const leadSchema = z.object({
   source: z.string().optional(),
   channelId: z.string().uuid().optional().nullable(),
   statusId: z.string().uuid().optional(),
-  assignedRealtorId: z.string().uuid().optional().nullable(),
+  assignedDealManagerId: z.string().uuid().optional().nullable(),
   assignedUserId: z.string().uuid().optional().nullable(),
   watchers: z.array(z.string().uuid()).optional(),
   custom: z.record(z.string()).optional(),
@@ -261,7 +264,7 @@ const leadPatchSchema = z.object({
   source: z.string().optional(),
   channelId: z.string().uuid().optional().nullable(),
   statusId: z.string().uuid().optional(),
-  assignedRealtorId: z.string().uuid().optional().nullable(),
+  assignedDealManagerId: z.string().uuid().optional().nullable(),
   assignedUserId: z.string().uuid().optional().nullable(),
   watchers: z.array(z.string().uuid()).optional(),
   custom: z.record(z.string()).optional(),
@@ -277,7 +280,7 @@ function normalizeLeadPhonePatch(phone: string | undefined) {
 }
 
 leadRoutes.post("/", requirePermission("leads.write"), async (c) => {
-  const body = leadSchema.safeParse(await c.req.json());
+  const body = leadSchema.safeParse(remapLegacyLeadInput(await c.req.json()));
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
   const user = c.get("user");
@@ -302,31 +305,21 @@ leadRoutes.post("/", requirePermission("leads.write"), async (c) => {
     channelId: data.channelId || null,
     pipelineId: stageRow?.pipelineId ?? firstStage.pipelineId,
     statusId,
-    assignedRealtorId: data.assignedRealtorId || null,
+    assignedDealManagerId: data.assignedDealManagerId || null,
     custom: data.custom || {},
     createdBy: data.createdBy || user.profile?.name || user.login,
     pdConsent: data.pdConsent ?? false,
     pdConsentAt: consentNow,
   }).returning();
 
-  const [allChannels, allRealtors, allStages] = await Promise.all([
-    db.select().from(channels),
-    db.select().from(realtors),
-    db.select({ id: stages.id, label: stages.label, pipelineId: stages.pipelineId }).from(stages),
-  ]);
   const stage = stageRow || firstStage;
-  const result = runStageAutomations(
-    stage.automations || [],
-    stage,
-    lead,
-    allChannels,
-    allRealtors,
-    allStages,
-  );
-  const autoPatch = await persistAutomationSideEffects(lead.id, lead, result);
-  if (Object.keys(autoPatch).length) {
-    await db.update(leads).set({ ...autoPatch, updatedAt: new Date() }).where(eq(leads.id, lead.id));
-  }
+  void triggerBlueprintsForLeadChange({
+    leadId: lead.id,
+    before: null,
+    after: lead,
+    isCreate: true,
+    userId: user.id,
+  }).catch(() => {});
 
   const full = await leadWithNotes(lead.id);
   void indexLeadAfterWrite({
@@ -349,11 +342,11 @@ leadRoutes.post("/", requirePermission("leads.write"), async (c) => {
     leadId: lead.id,
     event: "notification",
   });
-  return c.json({ lead: full }, 201);
+  return c.json({ lead: withLegacyLeadFields(full!) }, 201);
 });
 
-leadRoutes.patch("/:id", requirePermission("leads.read"), async (c) => {
-  const body = leadPatchSchema.safeParse(await c.req.json());
+leadRoutes.patch("/:id", requirePermission("leads.write"), async (c) => {
+  const body = leadPatchSchema.safeParse(remapLegacyLeadInput(await c.req.json()));
   if (!body.success) return c.json({ error: body.error.issues[0]?.message || "Invalid input" }, 400);
 
   const id = c.req.param("id");
@@ -381,8 +374,8 @@ leadRoutes.patch("/:id", requirePermission("leads.read"), async (c) => {
 
   if (patch.assignedUserId !== undefined) {
     Object.assign(patch, await resolveAssigneeFromUser(patch.assignedUserId as string | null));
-  } else if (patch.assignedRealtorId !== undefined) {
-    Object.assign(patch, await resolveAssigneeFromRealtor(patch.assignedRealtorId as string | null));
+  } else if (patch.assignedDealManagerId !== undefined) {
+    Object.assign(patch, await resolveAssigneeFromDealManager(patch.assignedDealManagerId as string | null));
   }
 
   const assignedUserId = (patch.assignedUserId ?? existing.assignedUserId) as string | null | undefined;
@@ -391,29 +384,33 @@ leadRoutes.patch("/:id", requirePermission("leads.read"), async (c) => {
   }
 
   const newStatusId = patch.statusId as string | undefined;
+  const stageChanged = Boolean(newStatusId && newStatusId !== existing.statusId);
 
-  if (newStatusId && newStatusId !== existing.statusId) {
-    const [stage] = await db.select().from(stages).where(eq(stages.id, newStatusId)).limit(1);
-    const [allChannels, allRealtors, allStages] = await Promise.all([
-      db.select().from(channels),
-      db.select().from(realtors),
-      db.select({ id: stages.id, label: stages.label, pipelineId: stages.pipelineId }).from(stages),
-    ]);
-    const updatedLead = { ...existing, ...patch, statusId: newStatusId };
-    const result = runStageAutomations(
-      stage?.automations || [],
-      stage || { id: newStatusId, label: "" },
-      updatedLead,
-      allChannels,
-      allRealtors,
-      allStages,
-    );
-    const autoPatch = await persistAutomationSideEffects(id, existing, result);
-    Object.assign(patch, autoPatch);
+  if (stageChanged && newStatusId) {
+    const allFields = await listFieldsForEntity("lead");
+    const pipelineId = (patch.pipelineId ?? existing.pipelineId) as string;
+    const filtered = filterFieldsForContext(allFields, "lead", { pipelineId });
+    const custom = {
+      ...(existing.custom as Record<string, unknown> ?? {}),
+      ...(patch.custom as Record<string, unknown> ?? {}),
+    };
+    const missing = validateRequiredFields(filtered, custom, { stageId: newStatusId });
+    if (missing.length) {
+      return c.json({ error: `Обязательные поля: ${missing.join(", ")}` }, 400);
+    }
   }
 
   await db.update(leads).set({ ...patch, updatedAt: new Date() }).where(eq(leads.id, id));
   const full = await leadWithNotes(id);
+
+  if (full) {
+    void triggerBlueprintsForLeadChange({
+      leadId: id,
+      before: existing,
+      after: full,
+      userId: user.id,
+    }).catch(() => {});
+  }
   let sdrPrediction = null;
   if (full) {
     void indexLeadAfterWrite({
@@ -424,7 +421,7 @@ leadRoutes.patch("/:id", requirePermission("leads.read"), async (c) => {
       region: full.region,
       comment: full.comment,
     });
-    if (newStatusId && newStatusId !== existing.statusId) {
+    if (stageChanged && newStatusId) {
       sdrPrediction = leadFptmScoring.recordTransition(full, existing.statusId!, newStatusId);
     }
   }
@@ -440,7 +437,7 @@ leadRoutes.patch("/:id", requirePermission("leads.read"), async (c) => {
     },
   });
   broadcastToAll("lead_updated", { lead: full });
-  return c.json({ lead: full });
+  return c.json({ lead: withLegacyLeadFields(full!) });
 });
 
 leadRoutes.post("/:id/revoke-consent", requirePermission("leads.erase"), async (c) => {

@@ -1,0 +1,208 @@
+{
+  "version": 1,
+  "docs": [
+    {
+      "id": "agent-patch-fields",
+      "path": "ai_docs/agent-patch-fields.md",
+      "title": "Agent API: PATCH полей сущности",
+      "tags": ["agent", "fields", "risc"],
+      "summary": "Контракт PATCH /api/agent/entities/:type/:id/fields — атомарные изменения Value по Field."
+    },
+    {
+      "id": "agent-schema",
+      "path": "ai_docs/agent-schema.md",
+      "title": "Agent API: Schema Catalog",
+      "tags": ["agent", "schema", "fields", "pipelines"],
+      "summary": "GET /api/agent/schema?compact=1 — Entity → Field catalog, pipelines, stages. Пример ответа, fieldType, связь с crmActions."
+    },
+    {
+      "id": "agent-capabilities",
+      "path": "ai_docs/agent-capabilities.md",
+      "title": "Agent API: Capabilities & Permissions",
+      "tags": ["agent", "permissions", "reactor", "tools"],
+      "summary": "GET /api/reactor/v1/agent/capabilities — gates, reactor.tools, workflows. Таблица прав по операциям."
+    },
+    {
+      "id": "agent-api-endpoints",
+      "path": "ai_docs/agent-api-endpoints.md",
+      "title": "Agent & AIboard API — полная карта эндпоинтов",
+      "tags": ["agent", "aiboard", "api", "reactor", "mail", "aggregation"],
+      "summary": "Полная карта /api/agent, /api/aiboard, /api/reactions, /api/settings/pipelines — методы, пути, описания."
+    },
+    {
+      "id": "ui-manifest",
+      "path": "ai_docs/ui-manifest.md",
+      "title": "UI Manifest (Reactor ↔ Site Builder)",
+      "tags": ["ui", "manifest", "site"],
+      "summary": "JSON Schema ui_manifest: registry компонентов, props, RISC actions."
+    },
+    {
+      "id": "dashboard-planner-rules",
+      "path": "ai_docs/dashboard-planner-rules.md",
+      "title": "Dashboard Planner (rule-based NL)",
+      "tags": ["analytics", "dashboard", "aiboard", "rules"],
+      "summary": "Ключевые слова → chartType/measure/groupBy без LLM; fallback когда AI недоступен."
+    },
+    {
+      "id": "dashboard-query",
+      "path": "ai_docs/dashboard-query.md",
+      "title": "NL-to-Dashboard whitelist",
+      "tags": ["analytics", "dashboard", "aiboard"],
+      "summary": "Манифест дашборда без SQL: measure, groupBy, chartType из whitelist."
+    },
+    {
+      "id": "aggregation-mapping",
+      "path": "ai_docs/aggregation-mapping.md",
+      "title": "Mapping Engine и error_tolerance_percent",
+      "tags": ["aggregation", "mapping", "aiboard"],
+      "summary": "Auto-merge полей при confidence ≥ порога; иначе pending_mappings."
+    },
+    {
+      "id": "circuit-breaker",
+      "path": "ai_docs/circuit-breaker.md",
+      "title": "AI Circuit Breaker",
+      "tags": ["ai", "security", "limits"],
+      "summary": "maxDepth, RPM, token budget, loop detection для AI-цепочек."
+    },
+    {
+      "id": "reactor-reactions-api",
+      "path": "ai_docs/reactor-reactions-api.md",
+      "title": "Reactor — API реакций (legacy)",
+      "tags": ["reactor", "reactions", "bindings", "automation", "ai", "legacy"],
+      "summary": "Legacy /api/reactions (blueprint_spaces). Для v3 используйте /api/reactor/v1 — см. reactor-api-overview."
+    },
+    {
+      "id": "reactor-api-overview",
+      "path": "ai_docs/reactor-api-overview.md",
+      "title": "Reactor v3.2 — обзор API",
+      "tags": ["reactor", "products", "v3", "api", "ai"],
+      "summary": "v3.2 API: ports, typed fields, ai-providers catalog, expanded architecture, grid 20px."
+    },
+    {
+      "id": "reactor-graphs",
+      "path": "ai_docs/reactor-graphs.md",
+      "title": "Reactor — графы flow/view/data",
+      "tags": ["reactor", "graphs", "nodes", "actors", "v3", "ai"],
+      "summary": "7 акторов v3.2 (API: nodes), пины exec/data, typed fields, resolveOverlaps, reaction-pack L0."
+    },
+    {
+      "id": "reactor-runtime",
+      "path": "ai_docs/reactor-runtime.md",
+      "title": "Reactor — runtime и UiManifest",
+      "tags": ["reactor", "runtime", "face", "ui-manifest", "ai"],
+      "summary": "GET /runtime → FaceRenderer, compileViewManifest, component registry."
+    },
+    {
+      "id": "reactor-compose",
+      "path": "ai_docs/reactor-compose.md",
+      "title": "Reactor — AI compose",
+      "tags": ["reactor", "compose", "ai", "sandbox"],
+      "summary": "LLM compose + rule fallback; graphs flow/view/data; graphKind для Маски; apply с plan; publish."
+    },
+    {
+      "id": "reactor-mask-design",
+      "path": "ai_docs/reactor-mask-design.md",
+      "title": "Reactor — режим Маска",
+      "tags": ["reactor", "mask", "design", "ui", "compose", "ai"],
+      "summary": "Живой UX, data-mask-id, панель Дизайн, mask-styles-root, graphKind=view для AI Compose."
+    },
+    {
+      "id": "thermo-engine",
+      "path": "ai_docs/thermo-engine.md",
+      "title": "Термодвижок — AI-фреймворк симуляций",
+      "tags": ["thermo", "simulation", "ai", "physics", "reactor"],
+      "summary": "Граф симуляций: Field, Agents, LLM, 13 нод; маппинг на Reactor v3; API simulation/ai/execute."
+    },
+    {
+      "id": "reactor-node-catalog-v3",
+      "path": "ai_docs/reactor-node-catalog-v3.md",
+      "title": "Reactor — каталог 7 акторов v3",
+      "tags": ["reactor", "nodes", "actors", "pulse", "touch", "face", "ai"],
+      "summary": "7 акторов v3.2 (в UI — «Акторы», в API — nodes). Ports, typed cfg fields, reaction-pack, правила AI."
+    },
+    {
+      "id": "reactor-ai-providers",
+      "path": "ai_docs/reactor-ai-providers.md",
+      "title": "Reactor — AI-провайдеры",
+      "tags": ["reactor", "ai", "providers", "fold", "compose"],
+      "summary": "GET /catalog/ai-providers — Ollama, OpenAI, Yandex, GigaChat, DeepSeek, … для fold.op=ai."
+    },
+    {
+      "id": "site-ai",
+      "path": "ai_docs/site-ai.md",
+      "title": "Site Reactor AI",
+      "tags": ["site", "reactor"],
+      "summary": "Plan/step/ui_manifest modes для Site Reactor."
+    },
+    {
+      "id": "crm-setup-actions",
+      "path": "ai_docs/crm-setup-actions.md",
+      "title": "CRM Setup crmActions",
+      "tags": ["crm", "analyst", "setup"],
+      "summary": "crmActions — pipeline/field/stage/link_subprocess setup."
+    },
+    {
+      "id": "mail-api",
+      "path": "ai_docs/mail-api.md",
+      "title": "Mail API — корпоративная почта",
+      "tags": ["mail", "imap", "crm", "edo"],
+      "summary": "Ящики IMAP/SMTP, sync, send, lead panel, email-нода, связь с ЭДО."
+    },
+    {
+      "id": "crm-frontend-structure",
+      "path": "ai_docs/crm-frontend-structure.md",
+      "title": "CRM Frontend — карта файлов",
+      "tags": ["crm", "frontend", "refactor", "sequencer"],
+      "summary": "App.tsx, useCrmMutations, LoginPage, views; RadialSequencer; правила AI."
+    },
+    {
+      "id": "lead-search-analytics",
+      "path": "ai_docs/lead-search-analytics.md",
+      "title": "Поиск и аналитика лидов (VaCoAl, FPTM)",
+      "tags": ["ml", "analytics", "search", "sequencer", "fptm"],
+      "summary": "VaCoAl multi-hop поиск, FPTM scoring этапов, граф лидов. Только аналитика — не управляет автоматизацией."
+    },
+    {
+      "id": "crm-team-api",
+      "path": "ai_docs/crm-team-api.md",
+      "title": "CRM API — команда и deal_manager",
+      "tags": ["api", "team", "leads", "rbac"],
+      "summary": "Переименование realtor→deal_manager, эндпоинты /api/team, assignedDealManagerId, обратная совместимость."
+    },
+    {
+      "id": "product-remediation-plan",
+      "path": "Для релиза/v1.0.0/PRODUCT_REMEDIATION_PLAN.md",
+      "title": "Product Remediation Plan (R01–R18)",
+      "tags": ["remediation", "release", "product"],
+      "summary": "Единый план правок продукта: P0–P3, недели 1–4."
+    },
+    {
+      "id": "reactor-node-ports",
+      "path": "ai_docs/reactor-node-ports.md",
+      "title": "Reactor — Порты и совместимость v3.2",
+      "tags": ["reactor", "ports", "edges", "nodes", "actors", "v3", "ai"],
+      "summary": "Полная матрица портов: exec/data-пины по типу ноды, 5 стандартных паттернов соединений, анти-паттерны."
+    },
+    {
+      "id": "reactor-ui-components",
+      "path": "ai_docs/reactor-ui-components.md",
+      "title": "Reactor — UI Компоненты (face.op=component)",
+      "tags": ["reactor", "face", "ui", "components", "view", "props", "ai"],
+      "summary": "Реестр 11 UI-компонентов (workspace.module, kanban.pipeline, kpi.metric, aggregation.canvas …) с props-схемой и примерами view-графов."
+    },
+    {
+      "id": "reactor-agent-workflows",
+      "path": "ai_docs/reactor-agent-workflows.md",
+      "title": "Reactor — Рабочие процессы для AI-агентов",
+      "tags": ["reactor", "agent", "workflow", "compose", "sandbox", "publish", "ai"],
+      "summary": "5 пошаговых workflows: создание продукта, автоматизация, Маска-UI, кастомные поля, sandbox-сессия. Диагностика ошибок."
+    },
+    {
+      "id": "reactor-v3-blueprint-bridge",
+      "path": "ai_docs/reactor-v3-blueprint-bridge.md",
+      "title": "Reactor — мост v3 акторов ↔ Blueprint",
+      "tags": ["reactor", "blueprint", "reactions", "spawn", "reaction-pack", "desugar", "ai"],
+      "summary": "Два слоя графов: product v3 (7 акторов) и blueprint L0. desugar, spawn, когда править reaction vs product flow."
+    }
+  ]
+}

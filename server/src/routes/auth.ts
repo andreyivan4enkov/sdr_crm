@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { setCookie, deleteCookie } from "hono/cookie";
+import { setCookie, deleteCookie, getCookie } from "hono/cookie";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.js";
@@ -7,7 +7,7 @@ import { users, roles, profiles, orgUnits } from "../db/schema.js";
 import {
   hashPassword, verifyPassword, signToken, getCookieName, cookieOptions,
 } from "../lib/auth.js";
-import { verifyInviteToken } from "../lib/invites.js";
+import { verifyInviteToken, consumeInviteToken } from "../lib/invites.js";
 import { requireAuth, loadUser, type AppEnv } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { validatePassword } from "../lib/password.js";
@@ -17,8 +17,12 @@ import {
   generateTotpSecret, verifyTotpCode, generateBackupCodes, hashBackupCode, verifyBackupCode,
 } from "../lib/totp.js";
 import { validateAvatarDataUrl } from "../lib/avatar.js";
+import { generateEmployeeAvatar } from "../lib/generate-avatar.js";
 import { toApiUser } from "../lib/user-public.js";
 import { createQrLoginToken, consumeQrLoginToken, isAllowedQrBaseUrl } from "../lib/qr-login.js";
+import { isDemoLoginAllowed, listDemoUsersForConfig, resolveDemoPassword } from "../lib/demo-login.js";
+import { isSecureRequest } from "../lib/secure-cookie.js";
+import { withLegacyInviteFlags, withLegacyProfileAccount } from "../lib/api-legacy-fields.js";
 
 const registerSchema = z.object({
   token: z.string().min(10),
@@ -41,19 +45,56 @@ const loginSchema = z.object({
 export const authRoutes = new Hono<AppEnv>();
 
 authRoutes.get("/config", (c) => {
-  const demoLogin = process.env.ALLOW_DEMO_LOGIN === "1"
-    || (process.env.NODE_ENV !== "production" && process.env.ALLOW_DEMO_LOGIN !== "0");
-  const demoUsers = demoLogin ? [
-    { login: "manager", password: process.env.DEMO_PASSWORD || "Operator1234", name: "Руководитель" },
-    { login: "operator", password: process.env.DEMO_PASSWORD || "Operator1234", name: "Оператор" },
-    { login: "integrator", password: process.env.INTEGRATOR_PASSWORD || process.env.DEMO_PASSWORD || "Integrator1234", name: "Интегратор" },
-    { login: process.env.ADMIN_LOGIN || "admin", password: process.env.ADMIN_PASSWORD || "Admin1234", name: "Администратор" },
-  ] : undefined;
+  return c.json({ demoLogin: isDemoLoginAllowed() });
+});
+
+authRoutes.get("/runtime", requireAuth, (c) => {
   return c.json({
-    demoLogin,
-    demoUsers,
     publicUrl: process.env.PUBLIC_URL || "http://localhost:5173",
+    demoLogin: isDemoLoginAllowed(),
+    demoUsers: isDemoLoginAllowed() ? listDemoUsersForConfig() : [],
   });
+});
+
+authRoutes.post("/demo-login", async (c) => {
+  if (!isDemoLoginAllowed()) {
+    return c.json({ error: "Demo login disabled" }, 403);
+  }
+  const ip = getClientIp(c);
+  if (!rateLimit(`demo-login:${ip}`, 30, 300_000)) {
+    return c.json({ error: "Слишком много попыток. Подождите 5 минут." }, 429);
+  }
+  const body = z.object({ login: z.string().min(1).max(50) }).safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid input" }, 400);
+
+  const password = resolveDemoPassword(body.data.login.trim());
+  if (!password) return c.json({ error: "Unknown demo user" }, 404);
+
+  const login = body.data.login.trim();
+  const ua = c.req.header("user-agent");
+  const [row] = await db.select().from(users).where(eq(users.login, login)).limit(1);
+  if (!row) {
+    return c.json({ error: "Demo user not seeded" }, 404);
+  }
+  const valid = await verifyPassword(password, row.passwordHash);
+  if (!valid) {
+    return c.json({ error: "Demo credentials mismatch — re-run db:seed with SEED_DEMO_USERS=1" }, 401);
+  }
+  if (row.status !== "active") {
+    return c.json({ error: "Demo account not active" }, 403);
+  }
+  if (row.totpEnabled && row.totpSecret) {
+    return c.json({ error: "2FA enabled on demo account" }, 403);
+  }
+
+  const authUser = await loadUser(row.id);
+  if (!authUser) return c.json({ error: "User not found" }, 401);
+
+  const token = await signToken(authUser);
+  const secure = isSecureRequest(c);
+  setCookie(c, getCookieName(), token, cookieOptions(secure));
+  await writeAudit({ userId: authUser.id, userLogin: authUser.login, action: "auth.login", ip, userAgent: ua, meta: { demo: true } });
+  return c.json({ user: toApiUser(authUser) });
 });
 
 authRoutes.get("/invite/verify", async (c) => {
@@ -72,7 +113,7 @@ authRoutes.get("/invite/verify", async (c) => {
     valid: true,
     role: role.label,
     roleName: role.name,
-    isRealtor: role.name === "realtor",
+    ...withLegacyInviteFlags({ isDealManager: role.name === "deal_manager" }),
     orgUnitId: invite.orgUnitId,
     orgUnitName,
   });
@@ -102,7 +143,7 @@ authRoutes.post("/register", async (c) => {
   const [role] = await db.select().from(roles).where(eq(roles.id, invite.roleId)).limit(1);
   if (!role) return c.json({ error: "Роль не найдена" }, 400);
 
-  if (role.name === "realtor" && !region?.trim()) {
+  if (role.name === "deal_manager" && !region?.trim()) {
     return c.json({ error: "Укажите регион работы" }, 400);
   }
 
@@ -128,9 +169,11 @@ authRoutes.post("/register", async (c) => {
     phone,
     region: region?.trim() || null,
     position,
-    avatar: avatar || null,
+    avatar: avatar || generateEmployeeAvatar(name),
     orgUnitId: invite.orgUnitId || null,
   });
+
+  await consumeInviteToken(body.data.token, invite.jti ?? null);
 
   await writeAudit({
     userId: user.id, userLogin: login, action: "auth.register",
@@ -195,7 +238,7 @@ authRoutes.post("/login", async (c) => {
   if (!authUser) return c.json({ error: "User not found" }, 401);
 
   const token = await signToken(authUser);
-  const secure = c.req.header("x-forwarded-proto") === "https";
+  const secure = isSecureRequest(c);
   setCookie(c, getCookieName(), token, cookieOptions(secure));
 
   await writeAudit({ userId: authUser.id, userLogin: authUser.login, action: "auth.login", ip, userAgent: ua });
@@ -258,7 +301,7 @@ authRoutes.post("/qr/accept", async (c) => {
   }
 
   const token = await signToken(authUser);
-  const secure = c.req.header("x-forwarded-proto") === "https";
+  const secure = isSecureRequest(c);
   setCookie(c, getCookieName(), token, cookieOptions(secure));
 
   const ua = c.req.header("user-agent");
@@ -274,7 +317,7 @@ authRoutes.post("/qr/accept", async (c) => {
 });
 
 authRoutes.post("/logout", async (c) => {
-  const token = c.req.header("Cookie")?.match(/jbr_token=([^;]+)/)?.[1];
+  const token = getCookie(c, getCookieName());
   if (token) {
     try {
       const { verifyToken } = await import("../lib/auth.js");
@@ -302,15 +345,15 @@ authRoutes.get("/profile", requireAuth, async (c) => {
   const [profile] = await db.select().from(profiles).where(eq(profiles.userId, user.id)).limit(1);
   return c.json({
     profile,
-    account: {
+    account: withLegacyProfileAccount({
       login: user.login,
       email: user.email,
       role: user.roleName,
       roleLabel: user.roleLabel || user.roleName,
       status: user.status,
       orgUnitName: user.orgUnitName,
-      isRealtor: user.roleName === "realtor",
-    },
+      isDealManager: user.roleName === "deal_manager",
+    }),
   });
 });
 
@@ -323,11 +366,12 @@ authRoutes.patch("/profile", requireAuth, async (c) => {
     region: z.string().max(100).optional().nullable(),
     email: z.string().email().optional(),
     avatar: z.string().max(500_000).optional().nullable(),
+    locale: z.enum(["ru", "en", "zh", "fr", "de"]).optional(),
   }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
 
-  const isRealtor = user.roleName === "realtor";
-  if (body.data.region !== undefined && isRealtor && !body.data.region?.trim()) {
+  const isDealManager = user.roleName === "deal_manager";
+  if (body.data.region !== undefined && isDealManager && !body.data.region?.trim()) {
     return c.json({ error: "Укажите регион работы" }, 400);
   }
 
@@ -352,6 +396,7 @@ authRoutes.patch("/profile", requireAuth, async (c) => {
     ...(body.data.phone !== undefined ? { phone: body.data.phone } : {}),
     ...(body.data.position !== undefined ? { position: body.data.position } : {}),
     ...(body.data.region !== undefined ? { region: body.data.region } : {}),
+    ...(body.data.locale !== undefined ? { locale: body.data.locale } : {}),
     ...(avatar !== undefined ? { avatar } : {}),
     updatedAt: new Date(),
   };
@@ -366,7 +411,7 @@ authRoutes.patch("/profile", requireAuth, async (c) => {
       phone: body.data.phone ?? null,
       position: body.data.position ?? null,
       region: body.data.region ?? null,
-      avatar: avatar ?? null,
+      avatar: avatar ?? generateEmployeeAvatar(body.data.name?.trim() || user.login),
     }).returning();
   }
 
@@ -430,22 +475,39 @@ authRoutes.patch("/password", requireAuth, async (c) => {
 });
 
 authRoutes.post("/totp/setup", requireAuth, async (c) => {
+  const ip = getClientIp(c);
+  if (!rateLimit(`totp-setup:${ip}`, 5, 300_000)) {
+    return c.json({ error: "Слишком много попыток. Подождите 5 минут." }, 429);
+  }
   const user = c.get("user");
+  const [row] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+  if (row?.totpEnabled) {
+    return c.json({ error: "Сначала отключите 2FA" }, 409);
+  }
   const { secret, uri } = generateTotpSecret(user.login);
-  return c.json({ secret, uri });
+  await db.update(users).set({
+    totpSecret: secret,
+    totpEnabled: false,
+    updatedAt: new Date(),
+  }).where(eq(users.id, user.id));
+  return c.json({ uri });
 });
 
 authRoutes.post("/totp/enable", requireAuth, async (c) => {
   const user = c.get("user");
-  const body = z.object({ secret: z.string(), code: z.string().length(6) }).safeParse(await c.req.json());
+  const body = z.object({ code: z.string().length(6) }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input" }, 400);
-  if (!verifyTotpCode(body.data.secret, body.data.code)) {
+
+  const [row] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+  if (!row?.totpSecret) return c.json({ error: "Сначала запустите настройку 2FA" }, 400);
+  if (row.totpEnabled) return c.json({ error: "2FA уже включена" }, 400);
+
+  if (!verifyTotpCode(row.totpSecret, body.data.code)) {
     return c.json({ error: "Неверный код" }, 400);
   }
   const backupCodes = generateBackupCodes();
   const hashed = backupCodes.map(hashBackupCode);
   await db.update(users).set({
-    totpSecret: body.data.secret,
     totpEnabled: true,
     totpBackupCodes: hashed,
     updatedAt: new Date(),
@@ -466,7 +528,10 @@ authRoutes.post("/totp/disable", requireAuth, async (c) => {
   if (!(await verifyPassword(body.data.password, row.passwordHash))) {
     return c.json({ error: "Неверный пароль" }, 401);
   }
-  if (row.totpSecret && !verifyTotpCode(row.totpSecret, body.data.code)) {
+  if (!row.totpSecret) {
+    return c.json({ error: "2FA не настроена" }, 400);
+  }
+  if (!verifyTotpCode(row.totpSecret, body.data.code)) {
     return c.json({ error: "Неверный код 2FA" }, 401);
   }
   await db.update(users).set({

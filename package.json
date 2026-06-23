@@ -1,7 +1,7 @@
 {
   "name": "sdr-crm",
   "version": "3.3.0",
-  "description": "Персональная CRM для риэлторского агентства",
+  "description": "Универсальная CRM-платформа: лиды, воронки, задачи, RBAC, Реактор",
   "type": "module",
   "license": "MIT",
   "author": "Corpuscul",
